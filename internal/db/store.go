@@ -345,6 +345,21 @@ WHERE id = ?
 	return s.SessionByID(ctx, id)
 }
 
+func (s *Store) DeleteSession(ctx context.Context, id int64) (Session, error) {
+	session, err := s.SessionByID(ctx, id)
+	if err != nil {
+		return Session{}, err
+	}
+
+	_, err = s.db.ExecContext(ctx, `
+DELETE FROM sessions WHERE id = ?
+`, id)
+	if err != nil {
+		return Session{}, err
+	}
+	return session, nil
+}
+
 func (s *Store) LogSessions(ctx context.Context, from, to *time.Time, project string) ([]Session, error) {
 	where := "WHERE 1=1"
 	var args []any
