@@ -1,4 +1,4 @@
-module github.com/tbuck/work-cli
+module github.com/Rasalas/work-cli
 
 go 1.26.0
 

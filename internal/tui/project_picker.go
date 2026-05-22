@@ -3,9 +3,9 @@ package tui
 import (
 	"fmt"
 
+	"github.com/Rasalas/work-cli/internal/db"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/tbuck/work-cli/internal/db"
 )
 
 type projectItem struct {

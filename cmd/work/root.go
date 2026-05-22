@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Rasalas/work-cli/internal/db"
+	"github.com/Rasalas/work-cli/internal/timeparse"
+	"github.com/Rasalas/work-cli/internal/tui"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"github.com/tbuck/work-cli/internal/db"
-	"github.com/tbuck/work-cli/internal/timeparse"
-	"github.com/tbuck/work-cli/internal/tui"
 )
 
 var out io.Writer = os.Stdout
