@@ -18,6 +18,10 @@ var (
 			Foreground(lipgloss.Color("230")).
 			Background(lipgloss.Color("30")).
 			Padding(0, 2)
+	logDurationStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("230")).
+				Background(lipgloss.Color("30")).
+				Padding(0, 2)
 	mutedBlockStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("246")).
 			Padding(0, 2)
@@ -29,6 +33,8 @@ var (
 			Align(lipgloss.Right)
 	metaStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("246"))
+	noteKindStyle = metaStyle.
+			Width(noteKindWidth)
 	valueStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252"))
 	sectionStyle = lipgloss.NewStyle().
@@ -37,7 +43,10 @@ var (
 			Padding(0, 2)
 )
 
-const outputKeyWidth = 11
+const (
+	outputKeyWidth = 11
+	noteKindWidth  = 5
+)
 
 func printNotes(notes []db.Note) {
 	for _, note := range notes {
@@ -94,7 +103,7 @@ func badgeLine(badge, value string) string {
 func noteLine(note db.Note) string {
 	return metaStyle.Render(formatClock(note.CreatedAt)) +
 		"  " +
-		metaStyle.Render(note.Kind) +
+		noteKindStyle.Render(note.Kind) +
 		"  " +
 		valueStyle.Render(note.Body)
 }

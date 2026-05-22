@@ -26,3 +26,33 @@ func TestParseStartTime(t *testing.T) {
 		}
 	}
 }
+
+func TestParseWorkDuration(t *testing.T) {
+	tests := map[string]time.Duration{
+		"5":    5 * time.Hour,
+		"5h":   5 * time.Hour,
+		"5:30": 5*time.Hour + 30*time.Minute,
+		"90m":  90 * time.Minute,
+		"7.5":  7*time.Hour + 30*time.Minute,
+	}
+
+	for input, want := range tests {
+		got, err := ParseWorkDuration(input)
+		if err != nil {
+			t.Fatalf("ParseWorkDuration(%q): %v", input, err)
+		}
+		if got != want {
+			t.Fatalf("ParseWorkDuration(%q) = %s, want %s", input, got, want)
+		}
+	}
+}
+
+func TestParseWorkDurationRejectsInvalidInput(t *testing.T) {
+	for _, input := range []string{"", "0", "-1h", "5:99", "nope"} {
+		t.Run(input, func(t *testing.T) {
+			if _, err := ParseWorkDuration(input); err == nil {
+				t.Fatalf("ParseWorkDuration(%q) error = nil", input)
+			}
+		})
+	}
+}

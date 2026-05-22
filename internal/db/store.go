@@ -41,6 +41,13 @@ type Note struct {
 	CreatedAt time.Time
 }
 
+type SessionUpdate struct {
+	StartedAt    *time.Time
+	EndedAt      *time.Time
+	ProjectID    *int64
+	ClearProject bool
+}
+
 var ErrAlreadyRunning = errors.New("a work session is already running")
 var ErrNoRunningSession = errors.New("no work session is running")
 
@@ -290,6 +297,52 @@ func (s *Store) SessionByID(ctx context.Context, id int64) (Session, error) {
 		return Session{}, sql.ErrNoRows
 	}
 	return rows[0], nil
+}
+
+func (s *Store) UpdateSession(ctx context.Context, id int64, update SessionUpdate) (Session, error) {
+	session, err := s.SessionByID(ctx, id)
+	if err != nil {
+		return Session{}, err
+	}
+
+	startedAt := session.StartedAt
+	if update.StartedAt != nil {
+		startedAt = *update.StartedAt
+	}
+	endedAt := session.EndedAt
+	if update.EndedAt != nil {
+		endedAt = sql.NullTime{Time: *update.EndedAt, Valid: true}
+	}
+	if endedAt.Valid && endedAt.Time.Before(startedAt) {
+		return Session{}, fmt.Errorf("end time cannot be before start time")
+	}
+
+	projectID := session.ProjectID
+	if update.ClearProject {
+		projectID = sql.NullInt64{}
+	}
+	if update.ProjectID != nil {
+		projectID = sql.NullInt64{Int64: *update.ProjectID, Valid: true}
+	}
+
+	var projectValue any
+	if projectID.Valid {
+		projectValue = projectID.Int64
+	}
+	var endValue any
+	if endedAt.Valid {
+		endValue = formatTime(endedAt.Time)
+	}
+
+	_, err = s.db.ExecContext(ctx, `
+UPDATE sessions
+SET project_id = ?, started_at = ?, ended_at = ?, updated_at = ?
+WHERE id = ?
+`, projectValue, formatTime(startedAt), endValue, formatTime(time.Now()), id)
+	if err != nil {
+		return Session{}, err
+	}
+	return s.SessionByID(ctx, id)
 }
 
 func (s *Store) LogSessions(ctx context.Context, from, to *time.Time, project string) ([]Session, error) {

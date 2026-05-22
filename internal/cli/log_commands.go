@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -39,21 +41,17 @@ func logCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			chronologicalSessions(sessions)
 			for _, session := range sessions {
-				project := []string{}
-				if session.ProjectName.Valid {
-					project = append(project, line("", session.ProjectName.String))
-				}
 				lines := []string{
-					badgeLine(formatSessionDuration(session, now), formatDateTime(session.StartedAt)+" - "+formatEnd(&session)),
+					logSessionHeader(session, now),
 				}
-				lines = append(lines, project...)
 				printBlock(lines...)
 				notes, err := store.NotesForSession(ctx, session.ID)
 				if err != nil {
 					return err
 				}
-				printNotes(notes)
+				printLogNotes(session.ID, notes)
 			}
 			return nil
 		},
@@ -64,25 +62,86 @@ func logCmd() *cobra.Command {
 	return cmd
 }
 
+func logSessionHeader(session db.Session, now time.Time) string {
+	timing := metaStyle.Render(formatDateTime(session.StartedAt) + " - " + formatEnd(&session))
+	duration := logDurationStyle.Render(formatSessionDuration(session, now))
+	id := metaStyle.Render(fmt.Sprintf("#%d", session.ID))
+	if session.ProjectName.Valid {
+		return fmt.Sprintf("%s   %s  %s  %s", id, duration, valueStyle.Render(session.ProjectName.String), timing)
+	}
+	return fmt.Sprintf("%s   %s  %s", id, duration, timing)
+}
+
+func printLogNotes(sessionID int64, notes []db.Note) {
+	if len(notes) == 0 {
+		return
+	}
+	for _, note := range notes {
+		printLine(logNoteLine(sessionID, note))
+	}
+	fmt.Fprintln(out)
+}
+
+func logNoteLine(sessionID int64, note db.Note) string {
+	return fmt.Sprintf("%*s%s", len(fmt.Sprintf("#%d   ", sessionID)), "", noteLine(note))
+}
+
 func todayDuration(ctx context.Context, store *db.Store, now time.Time) (time.Duration, error) {
+	summary, err := todaySummary(ctx, store, now)
+	if err != nil {
+		return 0, err
+	}
+	return summary.Work, nil
+}
+
+type daySummaryInfo struct {
+	Sessions []db.Session
+	Work     time.Duration
+	Paused   time.Duration
+	First    sql.NullTime
+}
+
+func todaySummary(ctx context.Context, store *db.Store, now time.Time) (daySummaryInfo, error) {
 	start := dayStart(now)
 	end := start.AddDate(0, 0, 1)
 	sessions, err := store.LogSessions(ctx, &start, &end, "")
 	if err != nil {
-		return 0, err
+		return daySummaryInfo{}, err
 	}
 
-	var total time.Duration
+	chronologicalSessions(sessions)
+
+	var summary daySummaryInfo
+	summary.Sessions = sessions
 	for _, session := range sessions {
+		if !summary.First.Valid || session.StartedAt.Before(summary.First.Time) {
+			summary.First = sql.NullTime{Time: session.StartedAt, Valid: true}
+		}
 		sessionEnd := now
 		if session.EndedAt.Valid {
 			sessionEnd = session.EndedAt.Time
 		}
 		if sessionEnd.After(session.StartedAt) {
-			total += sessionEnd.Sub(session.StartedAt)
+			summary.Work += sessionEnd.Sub(session.StartedAt)
 		}
 	}
-	return total, nil
+
+	for i := 1; i < len(sessions); i++ {
+		previous := sessions[i-1]
+		if !previous.EndedAt.Valid {
+			continue
+		}
+		if sessions[i].StartedAt.After(previous.EndedAt.Time) {
+			summary.Paused += sessions[i].StartedAt.Sub(previous.EndedAt.Time)
+		}
+	}
+	return summary, nil
+}
+
+func chronologicalSessions(sessions []db.Session) {
+	for i, j := 0, len(sessions)-1; i < j; i, j = i+1, j-1 {
+		sessions[i], sessions[j] = sessions[j], sessions[i]
+	}
 }
 
 func dayStart(t time.Time) time.Time {

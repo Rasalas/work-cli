@@ -10,6 +10,50 @@ import (
 
 var digitsOnly = regexp.MustCompile(`^\d{1,4}$`)
 
+// ParseWorkDuration parses convenient work-duration forms.
+// Bare numbers such as "5" are interpreted as hours.
+func ParseWorkDuration(input string) (time.Duration, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return 0, fmt.Errorf("duration is required")
+	}
+
+	if duration, err := time.ParseDuration(input); err == nil {
+		if duration <= 0 {
+			return 0, fmt.Errorf("duration must be positive")
+		}
+		return duration, nil
+	}
+
+	if strings.Contains(input, ":") {
+		parts := strings.Split(input, ":")
+		if len(parts) != 2 {
+			return 0, fmt.Errorf("invalid duration %q", input)
+		}
+		hours, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return 0, fmt.Errorf("invalid hours in %q", input)
+		}
+		minutes, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return 0, fmt.Errorf("invalid minutes in %q", input)
+		}
+		if hours < 0 || minutes < 0 || minutes > 59 || hours == 0 && minutes == 0 {
+			return 0, fmt.Errorf("invalid duration %q", input)
+		}
+		return time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute, nil
+	}
+
+	hours, err := strconv.ParseFloat(input, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid duration %q", input)
+	}
+	if hours <= 0 {
+		return 0, fmt.Errorf("duration must be positive")
+	}
+	return time.Duration(hours * float64(time.Hour)), nil
+}
+
 // ParseStartTime parses convenient CLI time forms into a concrete timestamp.
 // Bare times such as "800", "8", or "08:30" are interpreted for base's date.
 func ParseStartTime(input string, base time.Time) (time.Time, error) {

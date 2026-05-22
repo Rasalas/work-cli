@@ -2,6 +2,15 @@
 
 A small local time-tracking CLI.
 
+## Install
+
+```bash
+make install
+```
+
+Installs the CLI as `work` into `$(go env GOPATH)/bin` by default.
+Set `BINDIR` to install elsewhere.
+
 ## Usage
 
 ```bash
@@ -10,8 +19,9 @@ work do "parser debuggen"
 work doing "sqlite migration pruefen"
 work done "migration laeuft"
 work status
-work end
+work end 1402
 work log --today
+work edit 1 --end 1430
 work db path
 ```
 

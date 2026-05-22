@@ -2,8 +2,11 @@ package cli
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strings"
 
+	"github.com/sahilm/fuzzy"
 	"github.com/spf13/cobra"
 
 	"github.com/Rasalas/work-cli/internal/db"
@@ -72,7 +75,7 @@ func resolveProject(ctx context.Context, store *db.Store, opts options) (*int64,
 		return nil, "", nil
 	}
 	if opts.project != "" {
-		project, err := store.AddProject(ctx, opts.project)
+		project, err := resolveNamedProject(ctx, store, opts.project)
 		if err != nil {
 			return nil, "", err
 		}
@@ -98,4 +101,45 @@ func resolveProject(ctx context.Context, store *db.Store, opts options) (*int64,
 		}
 		return &picked.ID, picked.Name, nil
 	}
+}
+
+func resolveNamedProject(ctx context.Context, store *db.Store, name string) (db.Project, error) {
+	project, err := store.ProjectByName(ctx, name)
+	if err == nil {
+		if project.Archived {
+			return store.AddProject(ctx, project.Name)
+		}
+		return project, nil
+	}
+	if err != sql.ErrNoRows {
+		return db.Project{}, err
+	}
+
+	projects, err := store.ActiveProjects(ctx)
+	if err != nil {
+		return db.Project{}, err
+	}
+	matches := fuzzy.FindFrom(name, projectSource(projects))
+	switch len(matches) {
+	case 0:
+		return db.Project{}, fmt.Errorf("project %q not found; use `work project add %s` to create it", name, name)
+	case 1:
+		return projects[matches[0].Index], nil
+	default:
+		names := make([]string, 0, len(matches))
+		for _, match := range matches {
+			names = append(names, projects[match.Index].Name)
+		}
+		return db.Project{}, fmt.Errorf("project %q matches multiple projects: %s", name, strings.Join(names, ", "))
+	}
+}
+
+type projectSource []db.Project
+
+func (p projectSource) String(i int) string {
+	return p[i].Name
+}
+
+func (p projectSource) Len() int {
+	return len(p)
 }

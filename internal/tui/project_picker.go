@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"unicode"
 
 	"github.com/Rasalas/work-cli/internal/db"
 	"github.com/charmbracelet/bubbles/list"
@@ -29,10 +30,21 @@ func (m pickerModel) Init() tea.Cmd {
 func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if startsProjectFilter(msg) && !m.list.SettingFilter() {
+			m.list.SetFilterState(list.Filtering)
+			var cmd tea.Cmd
+			m.list, cmd = m.list.Update(msg)
+			return m, cmd
+		}
 		switch msg.String() {
-		case "ctrl+c", "esc", "q":
+		case "ctrl+c":
 			m.quit = true
 			return m, tea.Quit
+		case "esc":
+			if !m.list.SettingFilter() {
+				m.quit = true
+				return m, tea.Quit
+			}
 		case "enter":
 			if item, ok := m.list.SelectedItem().(projectItem); ok {
 				project := item.project
@@ -52,6 +64,14 @@ func (m pickerModel) View() string {
 		return ""
 	}
 	return m.list.View()
+}
+
+func startsProjectFilter(msg tea.KeyMsg) bool {
+	if len(msg.Runes) != 1 {
+		return false
+	}
+	r := msg.Runes[0]
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 func PickProject(projects []db.Project) (*db.Project, error) {

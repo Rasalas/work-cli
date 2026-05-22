@@ -11,8 +11,10 @@ type options struct {
 	project   string
 	noProject bool
 	at        string
+	target    string
 	today     bool
 	week      bool
+	timeline  bool
 }
 
 func Execute() {
@@ -30,6 +32,6 @@ func rootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	cmd.AddCommand(startCmd(), noteCmd("do"), noteCmd("doing"), noteCmd("done"), endCmd(), statusCmd(), logCmd(), projectCmd(), dbCmd())
+	cmd.AddCommand(startCmd(), noteCmd("do"), noteCmd("doing"), noteCmd("done"), endCmd(), editCmd(), statusCmd(), logCmd(), projectCmd(), dbCmd())
 	return cmd
 }
