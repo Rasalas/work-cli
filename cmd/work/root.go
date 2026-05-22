@@ -9,11 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/spf13/cobra"
+
 	"github.com/Rasalas/work-cli/internal/db"
 	"github.com/Rasalas/work-cli/internal/timeparse"
 	"github.com/Rasalas/work-cli/internal/tui"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/spf13/cobra"
 )
 
 var out io.Writer = os.Stdout
@@ -84,10 +85,11 @@ func startCmd() *cobra.Command {
 				projectName = session.ProjectName.String
 			}
 
-			fmt.Fprintf(out, "Started: %s\n", formatDateTime(session.StartedAt))
+			lines := []string{badgeLine("started", formatDateTime(session.StartedAt))}
 			if projectName != "" {
-				fmt.Fprintf(out, "Project: %s\n", projectName)
+				lines = append(lines, line("", projectName))
 			}
+			printBlock(lines...)
 			return nil
 		},
 	}
@@ -116,7 +118,7 @@ func noteCmd(kind string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(out, "%s %-5s %s\n", formatClock(note.CreatedAt), note.Kind, note.Body)
+			printBlock(noteLine(note))
 			return nil
 		},
 	}
@@ -146,8 +148,10 @@ func endCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(out, "Ended: %s\n", formatDateTime(session.EndedAt.Time))
-			fmt.Fprintf(out, "Duration: %s\n", formatDuration(session.EndedAt.Time.Sub(session.StartedAt)))
+			printBlock(
+				badgeLine("ended", formatDateTime(session.EndedAt.Time)),
+				line("", formatDuration(session.EndedAt.Time.Sub(session.StartedAt))),
+			)
 			return nil
 		},
 	}
@@ -178,25 +182,32 @@ func statusCmd() *cobra.Command {
 				return err
 			}
 			if running == nil {
-				fmt.Fprintln(out, "Status: idle")
-				fmt.Fprintf(out, "Today: %s\n", formatDuration(today))
+				printBlock(badgeLine("idle", formatDuration(today)+" today"))
 				last, err := store.LastSession(ctx)
 				if err != nil {
 					return err
 				}
 				if last != nil {
-					fmt.Fprintf(out, "Last session: %s - %s, %s\n", formatDateTime(last.StartedAt), formatEnd(last), formatSessionDuration(*last, now))
+					printMuted(
+						line("last", fmt.Sprintf("%s - %s", formatDateTime(last.StartedAt), formatEnd(last))),
+						line("", formatSessionDuration(*last, now)),
+					)
 				}
 				return nil
 			}
 
-			fmt.Fprintln(out, "Status: running")
-			if running.ProjectName.Valid {
-				fmt.Fprintf(out, "Project: %s\n", running.ProjectName.String)
+			lines := []string{
+				badgeLine("running", formatDuration(now.Sub(running.StartedAt))),
+				"",
 			}
-			fmt.Fprintf(out, "Started: %s\n", formatDateTime(running.StartedAt))
-			fmt.Fprintf(out, "Duration: %s\n", formatDuration(now.Sub(running.StartedAt)))
-			fmt.Fprintf(out, "Today: %s\n", formatDuration(today))
+			if running.ProjectName.Valid {
+				lines = append(lines, line("", running.ProjectName.String))
+			}
+			lines = append(lines,
+				line("started", formatDateTime(running.StartedAt)),
+				line("today", formatDuration(today)),
+			)
+			printBlock(lines...)
 
 			notes, err := store.NotesForSession(ctx, running.ID)
 			if err != nil {
@@ -205,8 +216,7 @@ func statusCmd() *cobra.Command {
 			if len(notes) == 0 {
 				return nil
 			}
-			fmt.Fprintln(out)
-			fmt.Fprintln(out, "Notes:")
+			printSection("notes")
 			printNotes(notes)
 			return nil
 		},
@@ -244,11 +254,15 @@ func logCmd() *cobra.Command {
 				return err
 			}
 			for _, session := range sessions {
-				project := ""
+				project := []string{}
 				if session.ProjectName.Valid {
-					project = "  " + session.ProjectName.String
+					project = append(project, line("", session.ProjectName.String))
 				}
-				fmt.Fprintf(out, "%s - %s  %s%s\n", formatDateTime(session.StartedAt), formatEnd(&session), formatSessionDuration(session, now), project)
+				lines := []string{
+					badgeLine(formatSessionDuration(session, now), fmt.Sprintf("%s - %s", formatDateTime(session.StartedAt), formatEnd(&session))),
+				}
+				lines = append(lines, project...)
+				printBlock(lines...)
 				notes, err := store.NotesForSession(ctx, session.ID)
 				if err != nil {
 					return err
@@ -284,7 +298,7 @@ func projectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(out, "Project: %s\n", project.Name)
+			printBlock(badgeLine("project", project.Name))
 			return nil
 		},
 	})
@@ -303,9 +317,15 @@ func projectCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for _, project := range projects {
-				fmt.Fprintln(out, project.Name)
+			if len(projects) == 0 {
+				printMuted(line("projects", "none"))
+				return nil
 			}
+			printSection("projects")
+			for _, project := range projects {
+				printLine(line("", project.Name))
+			}
+			fmt.Fprintln(out)
 			return nil
 		},
 	})
@@ -358,8 +378,88 @@ func openStore() (*db.Store, error) {
 
 func printNotes(notes []db.Note) {
 	for _, note := range notes {
-		fmt.Fprintf(out, "  %s %-5s %s\n", formatClock(note.CreatedAt), note.Kind, note.Body)
+		printLine(noteLine(note))
 	}
+	fmt.Fprintln(out)
+}
+
+var (
+	accentStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("230")).
+			Background(lipgloss.Color("30")).
+			Padding(0, 2)
+	mutedBlockStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("246")).
+			Padding(0, 2)
+	lineStyle = lipgloss.NewStyle().
+			Padding(0, 2)
+	keyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("246")).
+			Width(outputKeyWidth).
+			Align(lipgloss.Right)
+	metaStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("246"))
+	valueStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("252"))
+	sectionStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("30")).
+			Bold(true).
+			Padding(0, 2)
+)
+
+const outputKeyWidth = 11
+
+func printBlock(lines ...string) {
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintln(out)
+	for _, text := range lines {
+		fmt.Fprintln(out, lineStyle.Render(text))
+	}
+	fmt.Fprintln(out)
+}
+
+func printMuted(lines ...string) {
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintln(out)
+	for _, text := range lines {
+		fmt.Fprintln(out, mutedBlockStyle.Render(text))
+	}
+	fmt.Fprintln(out)
+}
+
+func printSection(title string) {
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, sectionStyle.Render(title))
+	fmt.Fprintln(out)
+}
+
+func printLine(lines ...string) {
+	for _, text := range lines {
+		fmt.Fprintln(out, lineStyle.Render(text))
+	}
+}
+
+func line(key, value string) string {
+	if key == "" {
+		return valueStyle.Render(value)
+	}
+	return keyStyle.Render(key) + "  " + valueStyle.Render(value)
+}
+
+func badgeLine(badge, value string) string {
+	return accentStyle.Render(badge) + "  " + valueStyle.Render(value)
+}
+
+func noteLine(note db.Note) string {
+	return metaStyle.Render(formatClock(note.CreatedAt)) +
+		"  " +
+		metaStyle.Render(note.Kind) +
+		"  " +
+		valueStyle.Render(note.Body)
 }
 
 func todayDuration(ctx context.Context, store *db.Store, now time.Time) (time.Duration, error) {
