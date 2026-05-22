@@ -38,7 +38,7 @@ func rootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	cmd.AddCommand(startCmd(), noteCmd("do"), noteCmd("doing"), noteCmd("done"), endCmd(), statusCmd(), logCmd(), projectCmd())
+	cmd.AddCommand(startCmd(), noteCmd("do"), noteCmd("doing"), noteCmd("done"), endCmd(), statusCmd(), logCmd(), projectCmd(), dbCmd())
 	return cmd
 }
 
@@ -322,6 +322,27 @@ func projectCmd() *cobra.Command {
 				printLine(line("", project.Name))
 			}
 			fmt.Fprintln(out)
+			return nil
+		},
+	})
+	return cmd
+}
+
+func dbCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "db",
+		Short: "Show database information",
+	}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "path",
+		Short: "Print the SQLite database path",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path, err := db.DefaultPath()
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(out, path)
 			return nil
 		},
 	})

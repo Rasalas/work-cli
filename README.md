@@ -12,6 +12,7 @@ work done "migration laeuft"
 work status
 work end
 work log --today
+work db path
 ```
 
 Data is stored in SQLite at `~/.local/share/work-cli/work.sqlite` by default.
