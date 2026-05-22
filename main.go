@@ -1,7 +1,7 @@
 package main
 
-import "github.com/Rasalas/work-cli/cmd/work"
+import "github.com/Rasalas/work-cli/internal/cli"
 
 func main() {
-	work.Execute()
+	cli.Execute()
 }
