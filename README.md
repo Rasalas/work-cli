@@ -11,6 +11,32 @@ make install
 Installs the CLI as `work` into `$(go env GOPATH)/bin` by default.
 Set `BINDIR` to install elsewhere.
 
+To install the latest GitHub release:
+
+```bash
+curl -fsSL https://github.com/Rasalas/work-cli/releases/latest/download/install.sh | bash
+```
+
+The installed binary can manage release installs:
+
+```bash
+work update
+work uninstall
+```
+
+## Release
+
+Push a semver tag to build and publish release binaries:
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
+```
+
+The release workflow uploads Linux, macOS, and Windows binaries plus SHA-256
+checksums directly to the GitHub release. It does not retain separate Actions
+artifacts or dependency caches.
+
 ## Usage
 
 ```bash

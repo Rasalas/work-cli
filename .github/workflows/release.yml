@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME}"
+          dist="dist"
+          mkdir -p "${dist}"
+
+          platforms=(
+            "linux/amd64"
+            "linux/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+            "windows/amd64"
+            "windows/arm64"
+          )
+
+          for platform in "${platforms[@]}"; do
+            goos="${platform%/*}"
+            goarch="${platform#*/}"
+            name="work-cli_${version}_${goos}_${goarch}"
+            binary="work"
+            archive="${name}.tar.gz"
+
+            if [[ "${goos}" == "windows" ]]; then
+              binary="work.exe"
+              archive="${name}.zip"
+            fi
+
+            workdir="$(mktemp -d)"
+            CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" go build \
+              -trimpath \
+              -ldflags="-s -w -X github.com/Rasalas/work-cli/internal/cli.version=${version} -X github.com/Rasalas/work-cli/internal/cli.commit=${GITHUB_SHA} -X github.com/Rasalas/work-cli/internal/cli.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              -o "${workdir}/${binary}" \
+              .
+
+            cp README.md LICENSE "${workdir}/"
+
+            if [[ "${goos}" == "windows" ]]; then
+              (cd "${workdir}" && zip -q "../${archive}" "${binary}" README.md LICENSE)
+              mv "$(dirname "${workdir}")/${archive}" "${dist}/"
+            else
+              tar -C "${workdir}" -czf "${dist}/${archive}" "${binary}" README.md LICENSE
+            fi
+
+            rm -rf "${workdir}"
+          done
+
+          cp scripts/install.sh "${dist}/install.sh"
+          (cd "${dist}" && sha256sum * > checksums.txt)
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            dist/*
