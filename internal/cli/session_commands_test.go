@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -140,6 +142,131 @@ func TestPrintTodayNotesPrintsProjectTitleOnProjectChange(t *testing.T) {
 func TestSessionProjectTitleUsesUndefinedForSessionWithoutProject(t *testing.T) {
 	if got, want := sessionProjectTitle(db.Session{}), "undefined"; got != want {
 		t.Fatalf("sessionProjectTitle() = %q, want %q", got, want)
+	}
+}
+
+func TestNoteCommandAddsNoteToLastEndedSession(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
+	t.Setenv("WORK_DB", dbPath)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+
+	ctx := context.Background()
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+	first, err := store.StartSession(ctx, base, nil)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, base.Add(time.Hour), ""); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	second, err := store.StartSession(ctx, base.Add(2*time.Hour), nil)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	secondEnd := base.Add(3 * time.Hour)
+	if _, err := store.EndRunningSession(ctx, secondEnd, ""); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if _, err := store.StartSession(ctx, base.Add(4*time.Hour), nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"done", "--last", "holiday support"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	store, err = db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	defer store.Close()
+	firstNotes, err := store.NotesForSession(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("NotesForSession(first) error = %v", err)
+	}
+	if len(firstNotes) != 0 {
+		t.Fatalf("len(firstNotes) = %d, want 0", len(firstNotes))
+	}
+	secondNotes, err := store.NotesForSession(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("NotesForSession(second) error = %v", err)
+	}
+	if got, want := len(secondNotes), 1; got != want {
+		t.Fatalf("len(secondNotes) = %d, want %d", got, want)
+	}
+	if got, want := secondNotes[0].Body, "holiday support"; got != want {
+		t.Fatalf("secondNotes[0].Body = %q, want %q", got, want)
+	}
+	if !secondNotes[0].CreatedAt.Equal(secondEnd) {
+		t.Fatalf("CreatedAt = %s, want %s", secondNotes[0].CreatedAt, secondEnd)
+	}
+}
+
+func TestNoteCommandAddsNoteToExplicitSessionAtStart(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
+	t.Setenv("WORK_DB", dbPath)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+
+	ctx := context.Background()
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+	session, err := store.StartSession(ctx, base, nil)
+	if err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, base.Add(time.Hour), ""); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"doing", "--session", strconv.FormatInt(session.ID, 10), "--at", "start", "holiday reason"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	store, err = db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	defer store.Close()
+	notes, err := store.NotesForSession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("NotesForSession() error = %v", err)
+	}
+	if got, want := len(notes), 1; got != want {
+		t.Fatalf("len(notes) = %d, want %d", got, want)
+	}
+	if !notes[0].CreatedAt.Equal(base) {
+		t.Fatalf("CreatedAt = %s, want %s", notes[0].CreatedAt, base)
 	}
 }
 

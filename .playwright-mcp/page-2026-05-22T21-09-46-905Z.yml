@@ -1,0 +1,119 @@
+- generic [active] [ref=e1]:
+  - link "Zum Inhalt springen" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - link "tbuck" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "tbuck" [ref=e6]
+      - generic [ref=e7]:
+        - link "Leistungen" [ref=e8] [cursor=pointer]:
+          - /url: /#leistungen
+        - link "Projekte" [ref=e9] [cursor=pointer]:
+          - /url: /#projekte
+        - link "Kontakt" [ref=e10] [cursor=pointer]:
+          - /url: /kontakt
+  - main [ref=e11]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "tagger" [level=1] [ref=e16]
+        - paragraph [ref=e17]: Semantische Git-Tags aus Conventional Commits
+        - paragraph [ref=e18]: "tagger automatisiert den letzten Schritt im Release-Workflow: Commits seit dem letzten Tag lesen, anhand von Conventional Commits den passenden Semver-Bump bestimmen und daraus den nächsten Git-Tag ableiten."
+        - paragraph [ref=e19]:
+          - img "Beispielausgabe von tagger status" [ref=e20]
+        - heading "Funktionen" [level=2] [ref=e21]
+        - list [ref=e22]:
+          - listitem [ref=e23]:
+            - strong [ref=e24]: Semver-Ermittlung
+            - text: "-"
+            - code [ref=e25]: feat
+            - text: ","
+            - code [ref=e26]: fix
+            - text: ","
+            - code [ref=e27]: refactor
+            - text: ","
+            - code [ref=e28]: perf
+            - text: und Breaking Changes werden in Major-, Minor- oder Patch-Bumps übersetzt.
+          - listitem [ref=e29]:
+            - strong [ref=e30]: Vorschau ohne Seiteneffekte
+            - text: "-"
+            - code [ref=e31]: tagger status
+            - text: und
+            - code [ref=e32]: tagger suggest
+            - text: zeigen den nächsten Tag, ohne etwas im Repository zu verändern.
+          - listitem [ref=e33]:
+            - strong [ref=e34]: Tag-Erstellung mit Bestätigung
+            - text: "-"
+            - code [ref=e35]: tagger bump
+            - text: erstellt den nächsten Tag und fragt vor dem Schreiben nach.
+          - listitem [ref=e36]:
+            - strong [ref=e37]: Release-Automation
+            - text: "-"
+            - code [ref=e38]: tagger bump --yes
+            - text: kann Tags ohne Dialog erstellen und direkt pushen.
+          - listitem [ref=e39]:
+            - strong [ref=e40]: Build-Suffixe
+            - text: "- Tags wie"
+            - code [ref=e41]: v3.4.0-58
+            - text: werden erkannt; die Semver-Komponente wird gebumpt und die Build-Nummer erhöht.
+          - listitem [ref=e42]:
+            - strong [ref=e43]: Kompakter Scope
+            - text: "- Kein Changelog, keine Release Notes, keine Projektverwaltung: tagger macht genau den Git-Tag."
+        - heading "Workflow" [level=2] [ref=e44]
+        - paragraph [ref=e45]:
+          - text: Im Alltag reicht erst eine Vorschau mit
+          - code [ref=e46]: tagger status
+          - text: . Wenn der vorgeschlagene Tag passt, erstellt
+          - code [ref=e47]: tagger bump
+          - text: denselben Tag mit Bestätigung; in CI- oder Script-Kontexten übernimmt
+          - code [ref=e48]: tagger bump --yes
+          - text: den nicht-interaktiven Pfad.
+        - heading "Installation" [level=2] [ref=e49]
+        - paragraph [ref=e50]:
+          - text: Die aktuelle Version lässt sich mit
+          - code [ref=e51]: go install github.com/rasalas/tagger@latest
+          - text: installieren.
+      - complementary [ref=e52]:
+        - img "tagger" [ref=e54]
+        - link " Auf GitHub ansehen" [ref=e56] [cursor=pointer]:
+          - /url: https://github.com/Rasalas/tagger
+          - generic [ref=e57]: 
+          - text: Auf GitHub ansehen
+        - generic [ref=e58]:
+          - generic [ref=e59]: Technologien
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]: 
+              - text: Go
+            - generic [ref=e63]:
+              - generic [ref=e64]: 
+              - text: Git
+            - generic [ref=e65]:
+              - generic [ref=e66]: 
+              - text: GitHub
+  - contentinfo [ref=e67]:
+    - generic [ref=e68]:
+      - paragraph [ref=e69]: © 2014–2026 Torben Buck
+      - generic [ref=e70]:
+        - link "Sicherer Kanal" [ref=e71] [cursor=pointer]:
+          - /url: /secure
+        - link "Datenschutz" [ref=e72] [cursor=pointer]:
+          - /url: /datenschutz
+        - link "Impressum" [ref=e73] [cursor=pointer]:
+          - /url: /impressum
+  - generic:
+    - generic: 
+    - generic: Nachricht gesendet. Ich melde mich schnellstmöglich.
+  - generic [ref=e76]:
+    - button "Menu" [ref=e77]:
+      - img [ref=e79]
+      - generic: Menu
+    - button "Inspect" [ref=e83]:
+      - img [ref=e85]
+      - generic: Inspect
+    - button "Audit" [ref=e87]:
+      - img [ref=e89]
+      - generic: Audit
+    - button "Settings" [ref=e92]:
+      - img [ref=e94]
+      - generic: Settings

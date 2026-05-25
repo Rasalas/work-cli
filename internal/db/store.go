@@ -252,10 +252,21 @@ func (s *Store) AddNote(ctx context.Context, kind, body string, createdAt time.T
 	if running == nil {
 		return Note{}, ErrNoRunningSession
 	}
+	return s.insertNote(ctx, running.ID, kind, body, createdAt)
+}
+
+func (s *Store) AddNoteToSession(ctx context.Context, sessionID int64, kind, body string, createdAt time.Time) (Note, error) {
+	if _, err := s.SessionByID(ctx, sessionID); err != nil {
+		return Note{}, err
+	}
+	return s.insertNote(ctx, sessionID, kind, body, createdAt)
+}
+
+func (s *Store) insertNote(ctx context.Context, sessionID int64, kind, body string, createdAt time.Time) (Note, error) {
 	result, err := s.db.ExecContext(ctx, `
 INSERT INTO notes (session_id, kind, body, created_at)
 VALUES (?, ?, ?, ?)
-`, running.ID, kind, body, formatTime(createdAt))
+`, sessionID, kind, body, formatTime(createdAt))
 	if err != nil {
 		return Note{}, err
 	}
@@ -263,7 +274,7 @@ VALUES (?, ?, ?, ?)
 	if err != nil {
 		return Note{}, err
 	}
-	return Note{ID: id, SessionID: running.ID, Kind: kind, Body: body, CreatedAt: createdAt}, nil
+	return Note{ID: id, SessionID: sessionID, Kind: kind, Body: body, CreatedAt: createdAt}, nil
 }
 
 func (s *Store) RunningSession(ctx context.Context) (*Session, error) {
@@ -286,6 +297,33 @@ func (s *Store) LastSession(ctx context.Context) (*Session, error) {
 		return nil, nil
 	}
 	return &rows[0], nil
+}
+
+func (s *Store) LastEndedSession(ctx context.Context) (*Session, error) {
+	var session Session
+	err := s.db.QueryRowContext(ctx, `
+SELECT s.id, s.project_id, p.name, s.started_at, s.ended_at, s.created_at, s.updated_at
+FROM sessions s
+LEFT JOIN projects p ON p.id = s.project_id
+WHERE s.ended_at IS NOT NULL
+ORDER BY s.ended_at DESC, s.id DESC
+LIMIT 1
+`).Scan(
+		&session.ID,
+		&session.ProjectID,
+		&session.ProjectName,
+		parseScanner(&session.StartedAt),
+		nullTimeScanner(&session.EndedAt),
+		parseScanner(&session.CreatedAt),
+		parseScanner(&session.UpdatedAt),
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }
 
 func (s *Store) SessionByID(ctx context.Context, id int64) (Session, error) {

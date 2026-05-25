@@ -44,9 +44,12 @@ work start 800 -p someproject
 work do "parser debuggen"
 work doing "sqlite migration pruefen"
 work done "migration laeuft"
+work done --last "Feiertagssupport wegen Produktionsfix"
+work doing --session 1 --at start "Feiertag, gearbeitet wegen Release"
 work status
 work end 1402
 work log --today
+work log --date 2026-05-25
 work edit 1 --end 1430
 work db path
 ```

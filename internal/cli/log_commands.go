@@ -12,7 +12,12 @@ import (
 )
 
 func logCmd() *cobra.Command {
-	var opts options
+	var opts struct {
+		today   bool
+		week    bool
+		project string
+		date    string
+	}
 	cmd := &cobra.Command{
 		Use:   "log",
 		Short: "List logged sessions",
@@ -26,6 +31,9 @@ func logCmd() *cobra.Command {
 
 			var from, to *time.Time
 			now := time.Now()
+			if selectedLogDateFilters(opts.today, opts.week, opts.date) > 1 {
+				return fmt.Errorf("use only one of --today, --week, or --date")
+			}
 			if opts.today {
 				start := dayStart(now)
 				end := start.AddDate(0, 0, 1)
@@ -33,6 +41,13 @@ func logCmd() *cobra.Command {
 			} else if opts.week {
 				start := weekStart(now)
 				end := start.AddDate(0, 0, 7)
+				from, to = &start, &end
+			} else if opts.date != "" {
+				start, err := parseLogDate(opts.date, now.Location())
+				if err != nil {
+					return err
+				}
+				end := start.AddDate(0, 0, 1)
 				from, to = &start, &end
 			}
 
@@ -58,8 +73,31 @@ func logCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&opts.today, "today", false, "show today's sessions")
 	cmd.Flags().BoolVar(&opts.week, "week", false, "show this week's sessions")
+	cmd.Flags().StringVar(&opts.date, "date", "", "show sessions for YYYY-MM-DD")
 	cmd.Flags().StringVarP(&opts.project, "project", "p", "", "filter by project")
 	return cmd
+}
+
+func selectedLogDateFilters(today, week bool, date string) int {
+	selected := 0
+	if today {
+		selected++
+	}
+	if week {
+		selected++
+	}
+	if date != "" {
+		selected++
+	}
+	return selected
+}
+
+func parseLogDate(input string, location *time.Location) (time.Time, error) {
+	parsed, err := time.ParseInLocation("2006-01-02", input, location)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid date %q; use YYYY-MM-DD", input)
+	}
+	return dayStart(parsed), nil
 }
 
 func logSessionHeader(session db.Session, now time.Time) string {

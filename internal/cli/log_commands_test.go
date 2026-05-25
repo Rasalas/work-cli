@@ -171,6 +171,56 @@ func TestLogCommandPrintsOldestSessionFirst(t *testing.T) {
 	}
 }
 
+func TestLogCommandFiltersByDate(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
+	t.Setenv("WORK_DB", dbPath)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	ctx := context.Background()
+	firstDay := time.Date(2026, 5, 24, 8, 0, 0, 0, time.Local)
+	if _, err := store.StartSession(ctx, firstDay, nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, firstDay.Add(time.Hour), "sunday"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	holiday := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+	if _, err := store.StartSession(ctx, holiday, nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, holiday.Add(time.Hour), "holiday support"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"log", "--date", "2026-05-25"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "holiday support") {
+		t.Fatalf("output = %q, want holiday note", output)
+	}
+	if strings.Contains(output, "sunday") {
+		t.Fatalf("output = %q, want sunday note filtered out", output)
+	}
+}
+
 func TestLogNoteLineAlignsTimeWithDuration(t *testing.T) {
 	note := db.Note{
 		Kind:      "do",

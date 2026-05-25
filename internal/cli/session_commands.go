@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -67,20 +68,63 @@ func startCmd() *cobra.Command {
 }
 
 func noteCmd(kind string) *cobra.Command {
-	return &cobra.Command{
+	var opts struct {
+		sessionID int64
+		last      bool
+		at        string
+	}
+	cmd := &cobra.Command{
 		Use:   kind + " <note>",
-		Short: "Add a " + kind + " note to the running session",
+		Short: "Add a " + kind + " note to a work session",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.sessionID < 0 {
+				return fmt.Errorf("session id must be positive")
+			}
+			if opts.sessionID > 0 && opts.last {
+				return fmt.Errorf("use either --session or --last")
+			}
+
 			store, err := openStore()
 			if err != nil {
 				return err
 			}
 			defer store.Close()
 
-			note, err := store.AddNote(context.Background(), kind, strings.Join(args, " "), time.Now())
+			ctx := context.Background()
+			noteBody := strings.Join(args, " ")
+			now := time.Now()
+			var note db.Note
+			if opts.sessionID > 0 || opts.last || opts.at != "" {
+				session, err := noteTargetSession(ctx, store, opts.sessionID, opts.last)
+				if errors.Is(err, db.ErrNoRunningSession) {
+					return fmt.Errorf("no session is running; use `work start`, `%s --last`, or `%s --session <id>`", kind, kind)
+				}
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("session #%d not found", opts.sessionID)
+				}
+				if err != nil {
+					return err
+				}
+				if session == nil {
+					if opts.last {
+						return fmt.Errorf("no ended sessions found; use `work log` to choose a session or `%s --session <id>`", kind)
+					}
+					return fmt.Errorf("no session is running; use `work start`, `%s --last`, or `%s --session <id>`", kind, kind)
+				}
+				createdAt, err := parseNoteTime(opts.at, *session, now)
+				if err != nil {
+					return err
+				}
+				note, err = store.AddNoteToSession(ctx, session.ID, kind, noteBody, createdAt)
+			} else {
+				note, err = store.AddNote(ctx, kind, noteBody, now)
+			}
 			if errors.Is(err, db.ErrNoRunningSession) {
-				return fmt.Errorf("no session is running; use `work start`")
+				return fmt.Errorf("no session is running; use `work start`, `%s --last`, or `%s --session <id>`", kind, kind)
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("session #%d not found", opts.sessionID)
 			}
 			if err != nil {
 				return err
@@ -88,6 +132,50 @@ func noteCmd(kind string) *cobra.Command {
 			printBlock(noteLine(note))
 			return nil
 		},
+	}
+	cmd.Flags().Int64Var(&opts.sessionID, "session", 0, "add note to a specific session id")
+	cmd.Flags().BoolVar(&opts.last, "last", false, "add note to the last ended session")
+	cmd.Flags().StringVar(&opts.at, "at", "", "note time, or start/end for the target session")
+	return cmd
+}
+
+func noteTargetSession(ctx context.Context, store *db.Store, sessionID int64, last bool) (*db.Session, error) {
+	if sessionID > 0 {
+		session, err := store.SessionByID(ctx, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		return &session, nil
+	}
+	if last {
+		session, err := store.LastEndedSession(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return session, nil
+	}
+	return store.RunningSession(ctx)
+}
+
+func parseNoteTime(input string, session db.Session, fallback time.Time) (time.Time, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		if session.EndedAt.Valid {
+			return session.EndedAt.Time, nil
+		}
+		return fallback, nil
+	}
+
+	switch strings.ToLower(input) {
+	case "start":
+		return session.StartedAt, nil
+	case "end":
+		if !session.EndedAt.Valid {
+			return time.Time{}, fmt.Errorf("session #%d has no end time", session.ID)
+		}
+		return session.EndedAt.Time, nil
+	default:
+		return timeparse.ParseStartTime(input, session.StartedAt)
 	}
 }
 

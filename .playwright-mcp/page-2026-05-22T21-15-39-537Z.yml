@@ -1,0 +1,1025 @@
+- generic [active] [ref=e1]:
+  - link "Zum Inhalt springen" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - link "tbuck" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "tbuck" [ref=e6]
+      - generic [ref=e7]:
+        - link "Leistungen" [ref=e8] [cursor=pointer]:
+          - /url: /#leistungen
+        - link "Projekte" [ref=e9] [cursor=pointer]:
+          - /url: /#projekte
+        - link "Kontakt" [ref=e10] [cursor=pointer]:
+          - /url: /kontakt
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e14]:
+        - paragraph [ref=e15]: // Hallo, ich bin
+        - heading "Torben Buck." [level=1] [ref=e16]:
+          - text: Torben
+          - text: Buck.
+        - paragraph [ref=e17]: Full-Stack Entwickler mit Fokus auf performante Webanwendungen und mobile Apps. Freiberuflich verfügbar für Ihr nächstes Projekt.
+        - generic [ref=e18]:
+          - link " Projekt anfragen" [ref=e19] [cursor=pointer]:
+            - /url: /kontakt
+            - generic [ref=e20]: 
+            - text: Projekt anfragen
+          - generic [ref=e21]:
+            - link "GitHub" [ref=e22] [cursor=pointer]:
+              - /url: https://www.github.com/Rasalas
+              - generic [ref=e23]: 
+            - link "GitLab" [ref=e24] [cursor=pointer]:
+              - /url: https://gitlab.com/torben.buck
+              - generic [ref=e25]: 
+            - link "git.nrw" [ref=e26] [cursor=pointer]:
+              - /url: https://gitlab.git.nrw/torben.buck
+              - generic [ref=e27]: 
+      - generic [ref=e29]: Scroll
+    - generic [ref=e33]:
+      - generic [ref=e34]: Über mich
+      - paragraph [ref=e35]: Als freiberuflicher Full-Stack Entwickler realisiere ich Webanwendungen und mobile Apps von der Konzeption bis zum Deployment. Neben meiner Selbständigkeit arbeite ich als wissenschaftlicher Mitarbeiter an der TH Köln, wo ich an Open-Source Projekten im Hochschulkontext entwickle.
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: Leistungen
+        - heading "Was ich anbiete" [level=2] [ref=e40]
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e44]: 
+          - heading "Webentwicklung" [level=3] [ref=e45]
+          - paragraph [ref=e46]: Moderne Webanwendungen mit PHP, Node.js und React. Von der Landing Page bis zur komplexen Plattform — responsiv, performant und sicher.
+        - generic [ref=e47]:
+          - generic [ref=e49]: 
+          - heading "Mobile Apps" [level=3] [ref=e50]
+          - paragraph [ref=e51]: Cross-platform Apps mit Flutter für iOS und Android. Native Performance mit einer einzigen Codebasis.
+        - generic [ref=e52]:
+          - generic [ref=e54]: 
+          - heading "Backend & APIs" [level=3] [ref=e55]
+          - paragraph [ref=e56]: RESTful APIs und Backend-Systeme mit Laravel, Express oder CodeIgniter. Datenbankdesign, Authentifizierung und Deployment.
+        - generic [ref=e57]:
+          - generic [ref=e59]: 
+          - heading "Open Source" [level=3] [ref=e60]
+          - paragraph [ref=e61]: Aktiver Beitrag zu Open-Source Projekten und Entwicklung eigener Tools und Libraries.
+    - generic [ref=e62]:
+      - generic [ref=e64]:
+        - generic [ref=e65]: Technologien
+        - heading "Womit ich arbeite" [level=2] [ref=e66]
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - generic [ref=e71]: 
+              - text: PHP
+            - generic [ref=e72]:
+              - generic [ref=e73]: 
+              - text: JavaScript
+            - generic [ref=e74]:
+              - generic [ref=e75]: 
+              - text: TypeScript
+            - generic [ref=e76]:
+              - generic [ref=e77]: 
+              - text: Python
+            - generic [ref=e78]:
+              - generic [ref=e79]: 
+              - text: Visual Basic .NET
+            - generic [ref=e80]:
+              - generic [ref=e81]: 
+              - text: C
+            - generic [ref=e82]:
+              - generic [ref=e83]: 
+              - text: Java
+            - generic [ref=e84]:
+              - generic [ref=e85]: 
+              - text: Go
+            - generic [ref=e86]:
+              - generic [ref=e87]: 
+              - text: lua
+            - generic [ref=e88]:
+              - generic [ref=e89]: 
+              - text: HTML
+            - generic [ref=e90]:
+              - generic [ref=e91]: 
+              - text: CSS
+            - generic [ref=e92]:
+              - generic [ref=e93]: 
+              - text: SQL
+            - generic [ref=e94]:
+              - generic [ref=e95]: 
+              - text: Dart
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - generic [ref=e98]: 
+              - text: PHP
+            - generic [ref=e99]:
+              - generic [ref=e100]: 
+              - text: JavaScript
+            - generic [ref=e101]:
+              - generic [ref=e102]: 
+              - text: TypeScript
+            - generic [ref=e103]:
+              - generic [ref=e104]: 
+              - text: Python
+            - generic [ref=e105]:
+              - generic [ref=e106]: 
+              - text: Visual Basic .NET
+            - generic [ref=e107]:
+              - generic [ref=e108]: 
+              - text: C
+            - generic [ref=e109]:
+              - generic [ref=e110]: 
+              - text: Java
+            - generic [ref=e111]:
+              - generic [ref=e112]: 
+              - text: Go
+            - generic [ref=e113]:
+              - generic [ref=e114]: 
+              - text: lua
+            - generic [ref=e115]:
+              - generic [ref=e116]: 
+              - text: HTML
+            - generic [ref=e117]:
+              - generic [ref=e118]: 
+              - text: CSS
+            - generic [ref=e119]:
+              - generic [ref=e120]: 
+              - text: SQL
+            - generic [ref=e121]:
+              - generic [ref=e122]: 
+              - text: Dart
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - generic [ref=e125]: 
+              - text: PHP
+            - generic [ref=e126]:
+              - generic [ref=e127]: 
+              - text: JavaScript
+            - generic [ref=e128]:
+              - generic [ref=e129]: 
+              - text: TypeScript
+            - generic [ref=e130]:
+              - generic [ref=e131]: 
+              - text: Python
+            - generic [ref=e132]:
+              - generic [ref=e133]: 
+              - text: Visual Basic .NET
+            - generic [ref=e134]:
+              - generic [ref=e135]: 
+              - text: C
+            - generic [ref=e136]:
+              - generic [ref=e137]: 
+              - text: Java
+            - generic [ref=e138]:
+              - generic [ref=e139]: 
+              - text: Go
+            - generic [ref=e140]:
+              - generic [ref=e141]: 
+              - text: lua
+            - generic [ref=e142]:
+              - generic [ref=e143]: 
+              - text: HTML
+            - generic [ref=e144]:
+              - generic [ref=e145]: 
+              - text: CSS
+            - generic [ref=e146]:
+              - generic [ref=e147]: 
+              - text: SQL
+            - generic [ref=e148]:
+              - generic [ref=e149]: 
+              - text: Dart
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - generic [ref=e152]: 
+              - text: PHP
+            - generic [ref=e153]:
+              - generic [ref=e154]: 
+              - text: JavaScript
+            - generic [ref=e155]:
+              - generic [ref=e156]: 
+              - text: TypeScript
+            - generic [ref=e157]:
+              - generic [ref=e158]: 
+              - text: Python
+            - generic [ref=e159]:
+              - generic [ref=e160]: 
+              - text: Visual Basic .NET
+            - generic [ref=e161]:
+              - generic [ref=e162]: 
+              - text: C
+            - generic [ref=e163]:
+              - generic [ref=e164]: 
+              - text: Java
+            - generic [ref=e165]:
+              - generic [ref=e166]: 
+              - text: Go
+            - generic [ref=e167]:
+              - generic [ref=e168]: 
+              - text: lua
+            - generic [ref=e169]:
+              - generic [ref=e170]: 
+              - text: HTML
+            - generic [ref=e171]:
+              - generic [ref=e172]: 
+              - text: CSS
+            - generic [ref=e173]:
+              - generic [ref=e174]: 
+              - text: SQL
+            - generic [ref=e175]:
+              - generic [ref=e176]: 
+              - text: Dart
+        - generic [ref=e177]:
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]: 
+              - text: MySQL
+            - generic [ref=e181]:
+              - generic [ref=e182]: 
+              - text: PostgreSQL
+            - generic [ref=e183]:
+              - generic [ref=e184]: 
+              - text: MongoDB
+            - generic [ref=e185]:
+              - generic [ref=e186]: 
+              - text: MariaDB
+            - generic [ref=e187]:
+              - generic [ref=e188]: 
+              - text: SQLite
+            - generic [ref=e189]:
+              - generic [ref=e190]: 
+              - text: MSAccess
+            - generic [ref=e191]:
+              - generic [ref=e192]: 
+              - text: OleDB
+            - generic [ref=e193]:
+              - generic [ref=e194]: 
+              - text: CodeIgniter
+            - generic [ref=e195]:
+              - generic [ref=e196]: 
+              - text: Laravel
+            - generic [ref=e197]:
+              - generic [ref=e198]: 
+              - text: WordPress
+            - generic [ref=e199]:
+              - generic [ref=e200]: 
+              - text: Express
+            - generic [ref=e201]:
+              - generic [ref=e202]: 
+              - text: Bootstrap
+            - generic [ref=e203]:
+              - generic [ref=e204]: 
+              - text: Node.js
+          - generic [ref=e205]:
+            - generic [ref=e206]:
+              - generic [ref=e207]: 
+              - text: MySQL
+            - generic [ref=e208]:
+              - generic [ref=e209]: 
+              - text: PostgreSQL
+            - generic [ref=e210]:
+              - generic [ref=e211]: 
+              - text: MongoDB
+            - generic [ref=e212]:
+              - generic [ref=e213]: 
+              - text: MariaDB
+            - generic [ref=e214]:
+              - generic [ref=e215]: 
+              - text: SQLite
+            - generic [ref=e216]:
+              - generic [ref=e217]: 
+              - text: MSAccess
+            - generic [ref=e218]:
+              - generic [ref=e219]: 
+              - text: OleDB
+            - generic [ref=e220]:
+              - generic [ref=e221]: 
+              - text: CodeIgniter
+            - generic [ref=e222]:
+              - generic [ref=e223]: 
+              - text: Laravel
+            - generic [ref=e224]:
+              - generic [ref=e225]: 
+              - text: WordPress
+            - generic [ref=e226]:
+              - generic [ref=e227]: 
+              - text: Express
+            - generic [ref=e228]:
+              - generic [ref=e229]: 
+              - text: Bootstrap
+            - generic [ref=e230]:
+              - generic [ref=e231]: 
+              - text: Node.js
+          - generic [ref=e232]:
+            - generic [ref=e233]:
+              - generic [ref=e234]: 
+              - text: MySQL
+            - generic [ref=e235]:
+              - generic [ref=e236]: 
+              - text: PostgreSQL
+            - generic [ref=e237]:
+              - generic [ref=e238]: 
+              - text: MongoDB
+            - generic [ref=e239]:
+              - generic [ref=e240]: 
+              - text: MariaDB
+            - generic [ref=e241]:
+              - generic [ref=e242]: 
+              - text: SQLite
+            - generic [ref=e243]:
+              - generic [ref=e244]: 
+              - text: MSAccess
+            - generic [ref=e245]:
+              - generic [ref=e246]: 
+              - text: OleDB
+            - generic [ref=e247]:
+              - generic [ref=e248]: 
+              - text: CodeIgniter
+            - generic [ref=e249]:
+              - generic [ref=e250]: 
+              - text: Laravel
+            - generic [ref=e251]:
+              - generic [ref=e252]: 
+              - text: WordPress
+            - generic [ref=e253]:
+              - generic [ref=e254]: 
+              - text: Express
+            - generic [ref=e255]:
+              - generic [ref=e256]: 
+              - text: Bootstrap
+            - generic [ref=e257]:
+              - generic [ref=e258]: 
+              - text: Node.js
+          - generic [ref=e259]:
+            - generic [ref=e260]:
+              - generic [ref=e261]: 
+              - text: MySQL
+            - generic [ref=e262]:
+              - generic [ref=e263]: 
+              - text: PostgreSQL
+            - generic [ref=e264]:
+              - generic [ref=e265]: 
+              - text: MongoDB
+            - generic [ref=e266]:
+              - generic [ref=e267]: 
+              - text: MariaDB
+            - generic [ref=e268]:
+              - generic [ref=e269]: 
+              - text: SQLite
+            - generic [ref=e270]:
+              - generic [ref=e271]: 
+              - text: MSAccess
+            - generic [ref=e272]:
+              - generic [ref=e273]: 
+              - text: OleDB
+            - generic [ref=e274]:
+              - generic [ref=e275]: 
+              - text: CodeIgniter
+            - generic [ref=e276]:
+              - generic [ref=e277]: 
+              - text: Laravel
+            - generic [ref=e278]:
+              - generic [ref=e279]: 
+              - text: WordPress
+            - generic [ref=e280]:
+              - generic [ref=e281]: 
+              - text: Express
+            - generic [ref=e282]:
+              - generic [ref=e283]: 
+              - text: Bootstrap
+            - generic [ref=e284]:
+              - generic [ref=e285]: 
+              - text: Node.js
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - generic [ref=e288]:
+              - generic [ref=e289]: 
+              - text: React
+            - generic [ref=e290]:
+              - generic [ref=e291]: 
+              - text: jQuery
+            - generic [ref=e292]:
+              - generic [ref=e293]: 
+              - text: Electron
+            - generic [ref=e294]:
+              - generic [ref=e295]: 
+              - text: Flutter
+            - generic [ref=e296]:
+              - generic [ref=e297]: 
+              - text: Leaflet
+            - generic [ref=e298]:
+              - generic [ref=e299]: 
+              - text: TailwindCSS
+            - generic [ref=e300]:
+              - generic [ref=e301]: 
+              - text: Browserify
+            - generic [ref=e302]:
+              - generic [ref=e303]: 
+              - text: Svelte
+            - generic [ref=e304]:
+              - generic [ref=e305]: 
+              - text: SvelteKit
+            - generic [ref=e306]:
+              - generic [ref=e307]: 
+              - text: Windows
+            - generic [ref=e308]:
+              - generic [ref=e309]: 
+              - text: Linux
+            - generic [ref=e310]:
+              - generic [ref=e311]: 
+              - text: macOS
+            - generic [ref=e312]:
+              - generic [ref=e313]: 
+              - text: Git
+          - generic [ref=e314]:
+            - generic [ref=e315]:
+              - generic [ref=e316]: 
+              - text: React
+            - generic [ref=e317]:
+              - generic [ref=e318]: 
+              - text: jQuery
+            - generic [ref=e319]:
+              - generic [ref=e320]: 
+              - text: Electron
+            - generic [ref=e321]:
+              - generic [ref=e322]: 
+              - text: Flutter
+            - generic [ref=e323]:
+              - generic [ref=e324]: 
+              - text: Leaflet
+            - generic [ref=e325]:
+              - generic [ref=e326]: 
+              - text: TailwindCSS
+            - generic [ref=e327]:
+              - generic [ref=e328]: 
+              - text: Browserify
+            - generic [ref=e329]:
+              - generic [ref=e330]: 
+              - text: Svelte
+            - generic [ref=e331]:
+              - generic [ref=e332]: 
+              - text: SvelteKit
+            - generic [ref=e333]:
+              - generic [ref=e334]: 
+              - text: Windows
+            - generic [ref=e335]:
+              - generic [ref=e336]: 
+              - text: Linux
+            - generic [ref=e337]:
+              - generic [ref=e338]: 
+              - text: macOS
+            - generic [ref=e339]:
+              - generic [ref=e340]: 
+              - text: Git
+          - generic [ref=e341]:
+            - generic [ref=e342]:
+              - generic [ref=e343]: 
+              - text: React
+            - generic [ref=e344]:
+              - generic [ref=e345]: 
+              - text: jQuery
+            - generic [ref=e346]:
+              - generic [ref=e347]: 
+              - text: Electron
+            - generic [ref=e348]:
+              - generic [ref=e349]: 
+              - text: Flutter
+            - generic [ref=e350]:
+              - generic [ref=e351]: 
+              - text: Leaflet
+            - generic [ref=e352]:
+              - generic [ref=e353]: 
+              - text: TailwindCSS
+            - generic [ref=e354]:
+              - generic [ref=e355]: 
+              - text: Browserify
+            - generic [ref=e356]:
+              - generic [ref=e357]: 
+              - text: Svelte
+            - generic [ref=e358]:
+              - generic [ref=e359]: 
+              - text: SvelteKit
+            - generic [ref=e360]:
+              - generic [ref=e361]: 
+              - text: Windows
+            - generic [ref=e362]:
+              - generic [ref=e363]: 
+              - text: Linux
+            - generic [ref=e364]:
+              - generic [ref=e365]: 
+              - text: macOS
+            - generic [ref=e366]:
+              - generic [ref=e367]: 
+              - text: Git
+          - generic [ref=e368]:
+            - generic [ref=e369]:
+              - generic [ref=e370]: 
+              - text: React
+            - generic [ref=e371]:
+              - generic [ref=e372]: 
+              - text: jQuery
+            - generic [ref=e373]:
+              - generic [ref=e374]: 
+              - text: Electron
+            - generic [ref=e375]:
+              - generic [ref=e376]: 
+              - text: Flutter
+            - generic [ref=e377]:
+              - generic [ref=e378]: 
+              - text: Leaflet
+            - generic [ref=e379]:
+              - generic [ref=e380]: 
+              - text: TailwindCSS
+            - generic [ref=e381]:
+              - generic [ref=e382]: 
+              - text: Browserify
+            - generic [ref=e383]:
+              - generic [ref=e384]: 
+              - text: Svelte
+            - generic [ref=e385]:
+              - generic [ref=e386]: 
+              - text: SvelteKit
+            - generic [ref=e387]:
+              - generic [ref=e388]: 
+              - text: Windows
+            - generic [ref=e389]:
+              - generic [ref=e390]: 
+              - text: Linux
+            - generic [ref=e391]:
+              - generic [ref=e392]: 
+              - text: macOS
+            - generic [ref=e393]:
+              - generic [ref=e394]: 
+              - text: Git
+        - generic [ref=e395]:
+          - generic [ref=e396]:
+            - generic [ref=e397]:
+              - generic [ref=e398]: 
+              - text: GitHub
+            - generic [ref=e399]:
+              - generic [ref=e400]: 
+              - text: Docker
+            - generic [ref=e401]:
+              - generic [ref=e402]: 
+              - text: Apache
+            - generic [ref=e403]:
+              - generic [ref=e404]: 
+              - text: Nginx
+            - generic [ref=e405]:
+              - generic [ref=e406]: 
+              - text: Visual Studio Code
+            - generic [ref=e407]:
+              - generic [ref=e408]: 
+              - text: Android Studio
+            - generic [ref=e409]:
+              - generic [ref=e410]: 
+              - text: Photoshop
+            - generic [ref=e411]:
+              - generic [ref=e412]: 
+              - text: Inkscape
+            - generic [ref=e413]:
+              - generic [ref=e414]: 
+              - text: Arduino
+            - generic [ref=e415]:
+              - generic [ref=e416]: 
+              - text: Affinity Designer
+          - generic [ref=e417]:
+            - generic [ref=e418]:
+              - generic [ref=e419]: 
+              - text: GitHub
+            - generic [ref=e420]:
+              - generic [ref=e421]: 
+              - text: Docker
+            - generic [ref=e422]:
+              - generic [ref=e423]: 
+              - text: Apache
+            - generic [ref=e424]:
+              - generic [ref=e425]: 
+              - text: Nginx
+            - generic [ref=e426]:
+              - generic [ref=e427]: 
+              - text: Visual Studio Code
+            - generic [ref=e428]:
+              - generic [ref=e429]: 
+              - text: Android Studio
+            - generic [ref=e430]:
+              - generic [ref=e431]: 
+              - text: Photoshop
+            - generic [ref=e432]:
+              - generic [ref=e433]: 
+              - text: Inkscape
+            - generic [ref=e434]:
+              - generic [ref=e435]: 
+              - text: Arduino
+            - generic [ref=e436]:
+              - generic [ref=e437]: 
+              - text: Affinity Designer
+          - generic [ref=e438]:
+            - generic [ref=e439]:
+              - generic [ref=e440]: 
+              - text: GitHub
+            - generic [ref=e441]:
+              - generic [ref=e442]: 
+              - text: Docker
+            - generic [ref=e443]:
+              - generic [ref=e444]: 
+              - text: Apache
+            - generic [ref=e445]:
+              - generic [ref=e446]: 
+              - text: Nginx
+            - generic [ref=e447]:
+              - generic [ref=e448]: 
+              - text: Visual Studio Code
+            - generic [ref=e449]:
+              - generic [ref=e450]: 
+              - text: Android Studio
+            - generic [ref=e451]:
+              - generic [ref=e452]: 
+              - text: Photoshop
+            - generic [ref=e453]:
+              - generic [ref=e454]: 
+              - text: Inkscape
+            - generic [ref=e455]:
+              - generic [ref=e456]: 
+              - text: Arduino
+            - generic [ref=e457]:
+              - generic [ref=e458]: 
+              - text: Affinity Designer
+          - generic [ref=e459]:
+            - generic [ref=e460]:
+              - generic [ref=e461]: 
+              - text: GitHub
+            - generic [ref=e462]:
+              - generic [ref=e463]: 
+              - text: Docker
+            - generic [ref=e464]:
+              - generic [ref=e465]: 
+              - text: Apache
+            - generic [ref=e466]:
+              - generic [ref=e467]: 
+              - text: Nginx
+            - generic [ref=e468]:
+              - generic [ref=e469]: 
+              - text: Visual Studio Code
+            - generic [ref=e470]:
+              - generic [ref=e471]: 
+              - text: Android Studio
+            - generic [ref=e472]:
+              - generic [ref=e473]: 
+              - text: Photoshop
+            - generic [ref=e474]:
+              - generic [ref=e475]: 
+              - text: Inkscape
+            - generic [ref=e476]:
+              - generic [ref=e477]: 
+              - text: Arduino
+            - generic [ref=e478]:
+              - generic [ref=e479]: 
+              - text: Affinity Designer
+    - generic [ref=e481]:
+      - generic [ref=e482]:
+        - generic [ref=e483]: Projekte
+        - heading "Öffentliche Projekte" [level=2] [ref=e484]
+      - generic [ref=e485]:
+        - link "work-cli work-cli Ein kleines Go-CLI für lokale Arbeits-Sessions mit Projekten, Notizen, SQLite-Speicherung und Release-Binaries für alle gängigen Plattformen.  Go  SQLite  GitHub  Linux  macOS +1" [ref=e486] [cursor=pointer]:
+          - /url: /project/work-cli/
+          - generic [ref=e487]:
+            - img "work-cli" [ref=e488]
+            - img [ref=e490]
+          - generic [ref=e493]:
+            - heading "work-cli" [level=3] [ref=e494]
+            - paragraph [ref=e495]: Ein kleines Go-CLI für lokale Arbeits-Sessions mit Projekten, Notizen, SQLite-Speicherung und Release-Binaries für alle gängigen Plattformen.
+            - generic [ref=e496]:
+              - generic [ref=e497]:
+                - generic [ref=e498]: 
+                - text: Go
+              - generic [ref=e499]:
+                - generic [ref=e500]: 
+                - text: SQLite
+              - generic [ref=e501]:
+                - generic [ref=e502]: 
+                - text: GitHub
+              - generic [ref=e503]:
+                - generic [ref=e504]: 
+                - text: Linux
+              - generic [ref=e505]:
+                - generic [ref=e506]: 
+                - text: macOS
+              - generic [ref=e507]: "+1"
+        - link "Chat Trail Chat Trail Eine Chromium-Erweiterung, die KI-Chatverläufe direkt im Browser als Markdown, JSON, HTML oder Evidence-ZIP exportiert, ohne Server, API-Keys oder Account-Crawling.  TypeScript  Vite  Chrome Extension  HTML  CSS" [ref=e508] [cursor=pointer]:
+          - /url: /project/chat-trail/
+          - generic [ref=e509]:
+            - img "Chat Trail" [ref=e510]
+            - img [ref=e512]
+          - generic [ref=e515]:
+            - heading "Chat Trail" [level=3] [ref=e516]
+            - paragraph [ref=e517]: Eine Chromium-Erweiterung, die KI-Chatverläufe direkt im Browser als Markdown, JSON, HTML oder Evidence-ZIP exportiert, ohne Server, API-Keys oder Account-Crawling.
+            - generic [ref=e518]:
+              - generic [ref=e519]:
+                - generic [ref=e520]: 
+                - text: TypeScript
+              - generic [ref=e521]:
+                - generic [ref=e522]: 
+                - text: Vite
+              - generic [ref=e523]:
+                - generic [ref=e524]: 
+                - text: Chrome Extension
+              - generic [ref=e525]:
+                - generic [ref=e526]: 
+                - text: HTML
+              - generic [ref=e527]:
+                - generic [ref=e528]: 
+                - text: CSS
+        - link "bitti bitti Eine Flutter-App, die private Geldanfragen als SEPA-kompatible QR-Codes vorbereitet, ohne Zahlungen auszuführen oder Bankdaten an einen Server zu übertragen.  Dart  Flutter  SQLite" [ref=e529] [cursor=pointer]:
+          - /url: /project/bitti/
+          - generic [ref=e530]:
+            - img "bitti" [ref=e531]
+            - img [ref=e533]
+          - generic [ref=e536]:
+            - heading "bitti" [level=3] [ref=e537]
+            - paragraph [ref=e538]: Eine Flutter-App, die private Geldanfragen als SEPA-kompatible QR-Codes vorbereitet, ohne Zahlungen auszuführen oder Bankdaten an einen Server zu übertragen.
+            - generic [ref=e539]:
+              - generic [ref=e540]:
+                - generic [ref=e541]: 
+                - text: Dart
+              - generic [ref=e542]:
+                - generic [ref=e543]: 
+                - text: Flutter
+              - generic [ref=e544]:
+                - generic [ref=e545]: 
+                - text: SQLite
+        - link "Sidetab Sidetab Eine Browser-Erweiterung für Chrome, die Bookmarks, Pins und temporäre Tabs in einem fokussierten Sidepanel organisiert.  Svelte  TypeScript  Vite  Chrome Extension" [ref=e546] [cursor=pointer]:
+          - /url: /project/sidetab/
+          - generic [ref=e547]:
+            - img "Sidetab" [ref=e548]
+            - img [ref=e550]
+          - generic [ref=e553]:
+            - heading "Sidetab" [level=3] [ref=e554]
+            - paragraph [ref=e555]: Eine Browser-Erweiterung für Chrome, die Bookmarks, Pins und temporäre Tabs in einem fokussierten Sidepanel organisiert.
+            - generic [ref=e556]:
+              - generic [ref=e557]:
+                - generic [ref=e558]: 
+                - text: Svelte
+              - generic [ref=e559]:
+                - generic [ref=e560]: 
+                - text: TypeScript
+              - generic [ref=e561]:
+                - generic [ref=e562]: 
+                - text: Vite
+              - generic [ref=e563]:
+                - generic [ref=e564]: 
+                - text: Chrome Extension
+        - link "md-print md-print Ein eleganter Markdown-Editor im Browser mit Live-Vorschau, der Dokumente typografisch aufbereitet und druckfertig als PDF ausgibt.  SvelteKit  Svelte  JavaScript  HTML  CSS" [ref=e565] [cursor=pointer]:
+          - /url: /project/md-print/
+          - generic [ref=e566]:
+            - img "md-print" [ref=e567]
+            - img [ref=e569]
+          - generic [ref=e572]:
+            - heading "md-print" [level=3] [ref=e573]
+            - paragraph [ref=e574]: Ein eleganter Markdown-Editor im Browser mit Live-Vorschau, der Dokumente typografisch aufbereitet und druckfertig als PDF ausgibt.
+            - generic [ref=e575]:
+              - generic [ref=e576]:
+                - generic [ref=e577]: 
+                - text: SvelteKit
+              - generic [ref=e578]:
+                - generic [ref=e579]: 
+                - text: Svelte
+              - generic [ref=e580]:
+                - generic [ref=e581]: 
+                - text: JavaScript
+              - generic [ref=e582]:
+                - generic [ref=e583]: 
+                - text: HTML
+              - generic [ref=e584]:
+                - generic [ref=e585]: 
+                - text: CSS
+        - link "tagger CLI tagger CLI Ein kleines Go-CLI, das seit dem letzten Git-Tag Conventional Commits analysiert, den nächsten Semver-Bump bestimmt und Tags erstellt.  Go  Git  GitHub" [ref=e586] [cursor=pointer]:
+          - /url: /project/tagger/
+          - generic [ref=e587]:
+            - img "tagger CLI" [ref=e588]
+            - img [ref=e590]
+          - generic [ref=e593]:
+            - heading "tagger CLI" [level=3] [ref=e594]
+            - paragraph [ref=e595]: Ein kleines Go-CLI, das seit dem letzten Git-Tag Conventional Commits analysiert, den nächsten Semver-Bump bestimmt und Tags erstellt.
+            - generic [ref=e596]:
+              - generic [ref=e597]:
+                - generic [ref=e598]: 
+                - text: Go
+              - generic [ref=e599]:
+                - generic [ref=e600]: 
+                - text: Git
+              - generic [ref=e601]:
+                - generic [ref=e602]: 
+                - text: GitHub
+        - link "Divekit CLI Divekit CLI Ein CLI-Tool zur automatisierten Erstellung, Konfiguration und Verwaltung von GitLab-Repositories für Hochschul-Lehrveranstaltungen.  Go  GitLab  CI/CD" [ref=e603] [cursor=pointer]:
+          - /url: /project/divekit-cli/
+          - generic [ref=e604]:
+            - img "Divekit CLI" [ref=e605]
+            - img [ref=e607]
+          - generic [ref=e610]:
+            - heading "Divekit CLI" [level=3] [ref=e611]
+            - paragraph [ref=e612]: Ein CLI-Tool zur automatisierten Erstellung, Konfiguration und Verwaltung von GitLab-Repositories für Hochschul-Lehrveranstaltungen.
+            - generic [ref=e613]:
+              - generic [ref=e614]:
+                - generic [ref=e615]: 
+                - text: Go
+              - generic [ref=e616]:
+                - generic [ref=e617]: 
+                - text: GitLab
+              - generic [ref=e618]:
+                - generic [ref=e619]: 
+                - text: CI/CD
+        - link "yeet yeet Ein CLI-Tool, das mit KI automatisch Commit-Messages generiert und Änderungen in einem Schritt committet und pusht.  Go  Git  GitHub" [ref=e620] [cursor=pointer]:
+          - /url: /project/yeet/
+          - generic [ref=e621]:
+            - img "yeet" [ref=e622]
+            - img [ref=e624]
+          - generic [ref=e627]:
+            - heading "yeet" [level=3] [ref=e628]
+            - paragraph [ref=e629]: Ein CLI-Tool, das mit KI automatisch Commit-Messages generiert und Änderungen in einem Schritt committet und pusht.
+            - generic [ref=e630]:
+              - generic [ref=e631]:
+                - generic [ref=e632]: 
+                - text: Go
+              - generic [ref=e633]:
+                - generic [ref=e634]: 
+                - text: Git
+              - generic [ref=e635]:
+                - generic [ref=e636]: 
+                - text: GitHub
+        - link "git.nrw git.nrw Die Projektwebsite für git.nrw — die zentrale, vom Land NRW geförderte GitLab-Plattform für Hochschulen in Nordrhein-Westfalen.  Hugo  HTML  CSS  JavaScript" [ref=e637] [cursor=pointer]:
+          - /url: /project/git-nrw/
+          - generic [ref=e638]:
+            - img "git.nrw" [ref=e639]
+            - img [ref=e641]
+          - generic [ref=e644]:
+            - heading "git.nrw" [level=3] [ref=e645]
+            - paragraph [ref=e646]: Die Projektwebsite für git.nrw — die zentrale, vom Land NRW geförderte GitLab-Plattform für Hochschulen in Nordrhein-Westfalen.
+            - generic [ref=e647]:
+              - generic [ref=e648]:
+                - generic [ref=e649]: 
+                - text: Hugo
+              - generic [ref=e650]:
+                - generic [ref=e651]: 
+                - text: HTML
+              - generic [ref=e652]:
+                - generic [ref=e653]: 
+                - text: CSS
+              - generic [ref=e654]:
+                - generic [ref=e655]: 
+                - text: JavaScript
+        - link "msgReader msgReader Ein Tool, das es ermöglicht, MSG-Dateien aus Outlook ohne Microsoft 365 Subscription zu öffnen und anzuzeigen.  Node.js  JavaScript  HTML  CSS  Browserify +1" [ref=e656] [cursor=pointer]:
+          - /url: /project/msg-reader/
+          - generic [ref=e657]:
+            - img "msgReader" [ref=e658]
+            - img [ref=e660]
+          - generic [ref=e663]:
+            - heading "msgReader" [level=3] [ref=e664]
+            - paragraph [ref=e665]: Ein Tool, das es ermöglicht, MSG-Dateien aus Outlook ohne Microsoft 365 Subscription zu öffnen und anzuzeigen.
+            - generic [ref=e666]:
+              - generic [ref=e667]:
+                - generic [ref=e668]: 
+                - text: Node.js
+              - generic [ref=e669]:
+                - generic [ref=e670]: 
+                - text: JavaScript
+              - generic [ref=e671]:
+                - generic [ref=e672]: 
+                - text: HTML
+              - generic [ref=e673]:
+                - generic [ref=e674]: 
+                - text: CSS
+              - generic [ref=e675]:
+                - generic [ref=e676]: 
+                - text: Browserify
+              - generic [ref=e677]: "+1"
+        - link "Sprachausgabe Sprachausgabe Diese Android App ermöglicht es dauerhaft oder temporär stummen Menschen mit anderen Menschen über Sprache zu kommunizieren, ohne zehntausende Euro für einen Sprachcomputer ausgeben zu müssen, der dann auch noch unhandlich ist.  Dart  Flutter" [ref=e678] [cursor=pointer]:
+          - /url: /project/sprachausgabe/
+          - generic [ref=e679]:
+            - img "Sprachausgabe" [ref=e680]
+            - img [ref=e682]
+          - generic [ref=e685]:
+            - heading "Sprachausgabe" [level=3] [ref=e686]
+            - paragraph [ref=e687]: Diese Android App ermöglicht es dauerhaft oder temporär stummen Menschen mit anderen Menschen über Sprache zu kommunizieren, ohne zehntausende Euro für einen Sprachcomputer ausgeben zu müssen, der dann auch noch unhandlich ist.
+            - generic [ref=e688]:
+              - generic [ref=e689]:
+                - generic [ref=e690]: 
+                - text: Dart
+              - generic [ref=e691]:
+                - generic [ref=e692]: 
+                - text: Flutter
+        - link "HuntReport HuntReport Diese Android App ermöglicht es dauerhaft oder temporär stummen Menschen mit anderen Menschen über Sprache zu kommunizieren, ohne zehntausende Euro für einen Sprachcomputer ausgeben zu müssen, der dann auch noch unhandlich ist.  Dart  Flutter  Firebase  PHP  MySQL +2" [ref=e693] [cursor=pointer]:
+          - /url: /project/huntreport/
+          - generic [ref=e694]:
+            - img "HuntReport" [ref=e695]
+            - img [ref=e697]
+          - generic [ref=e700]:
+            - heading "HuntReport" [level=3] [ref=e701]
+            - paragraph [ref=e702]: Diese Android App ermöglicht es dauerhaft oder temporär stummen Menschen mit anderen Menschen über Sprache zu kommunizieren, ohne zehntausende Euro für einen Sprachcomputer ausgeben zu müssen, der dann auch noch unhandlich ist.
+            - generic [ref=e703]:
+              - generic [ref=e704]:
+                - generic [ref=e705]: 
+                - text: Dart
+              - generic [ref=e706]:
+                - generic [ref=e707]: 
+                - text: Flutter
+              - generic [ref=e708]:
+                - generic [ref=e709]: 
+                - text: Firebase
+              - generic [ref=e710]:
+                - generic [ref=e711]: 
+                - text: PHP
+              - generic [ref=e712]:
+                - generic [ref=e713]: 
+                - text: MySQL
+              - generic [ref=e714]: "+2"
+        - link "Karte Breckerfeld Karte Breckerfeld Eine Karte mit Pins, die über eine Seitenleiste weitere Informationen anzeigen kann. Entstanden durch Zusammenarbeit mit dem Stadtmarketing Breckerfeld.  PHP  MySQL  CodeIgniter  JavaScript  Leaflet +4" [ref=e715] [cursor=pointer]:
+          - /url: /project/karte-breckerfeld/
+          - generic [ref=e716]:
+            - img "Karte Breckerfeld" [ref=e717]
+            - img [ref=e719]
+          - generic [ref=e722]:
+            - heading "Karte Breckerfeld" [level=3] [ref=e723]
+            - paragraph [ref=e724]: Eine Karte mit Pins, die über eine Seitenleiste weitere Informationen anzeigen kann. Entstanden durch Zusammenarbeit mit dem Stadtmarketing Breckerfeld.
+            - generic [ref=e725]:
+              - generic [ref=e726]:
+                - generic [ref=e727]: 
+                - text: PHP
+              - generic [ref=e728]:
+                - generic [ref=e729]: 
+                - text: MySQL
+              - generic [ref=e730]:
+                - generic [ref=e731]: 
+                - text: CodeIgniter
+              - generic [ref=e732]:
+                - generic [ref=e733]: 
+                - text: JavaScript
+              - generic [ref=e734]:
+                - generic [ref=e735]: 
+                - text: Leaflet
+              - generic [ref=e736]: "+4"
+        - link "Picimize Picimize Auf Webseiten benutzt man ja gern etwas kleinere Versionen von Bildern um u. A. schnellere Ladezeiten zu bekommen. Dieses Tool macht es sehr einfach.  Visual Basic .NET" [ref=e737] [cursor=pointer]:
+          - /url: /project/picimize/
+          - generic [ref=e738]:
+            - img "Picimize" [ref=e739]
+            - img [ref=e741]
+          - generic [ref=e744]:
+            - heading "Picimize" [level=3] [ref=e745]
+            - paragraph [ref=e746]: Auf Webseiten benutzt man ja gern etwas kleinere Versionen von Bildern um u. A. schnellere Ladezeiten zu bekommen. Dieses Tool macht es sehr einfach.
+            - generic [ref=e748]:
+              - generic [ref=e749]: 
+              - text: Visual Basic .NET
+        - link "PictureOut PictureOut Rewrite eines vorhandenen in VB6 geschriebenen Programms, das der Darstellung archivierter Dokumente diente. Links das Dokument, rechts eine Auflistung der Dokumente mit wichtigen Informationen aus dem Dokument. Leider steht es nicht frei zur Verfügung.  Visual Basic .NET  OleDB  MSAccess" [ref=e750] [cursor=pointer]:
+          - /url: /project/pictureout/
+          - generic [ref=e751]:
+            - img "PictureOut" [ref=e752]
+            - img [ref=e754]
+          - generic [ref=e757]:
+            - heading "PictureOut" [level=3] [ref=e758]
+            - paragraph [ref=e759]: Rewrite eines vorhandenen in VB6 geschriebenen Programms, das der Darstellung archivierter Dokumente diente. Links das Dokument, rechts eine Auflistung der Dokumente mit wichtigen Informationen aus dem Dokument. Leider steht es nicht frei zur Verfügung.
+            - generic [ref=e760]:
+              - generic [ref=e761]:
+                - generic [ref=e762]: 
+                - text: Visual Basic .NET
+              - generic [ref=e763]:
+                - generic [ref=e764]: 
+                - text: OleDB
+              - generic [ref=e765]:
+                - generic [ref=e766]: 
+                - text: MSAccess
+    - generic [ref=e769]:
+      - generic [ref=e770]: Kontakt
+      - heading "Interesse an einer Zusammenarbeit?" [level=2] [ref=e771]:
+        - text: Interesse an einer
+        - text: Zusammenarbeit?
+      - paragraph [ref=e772]: Erzählen Sie mir von Ihrem Projekt. Ich melde mich innerhalb von 24 Stunden.
+      - link " Kontakt aufnehmen" [ref=e773] [cursor=pointer]:
+        - /url: /kontakt
+        - generic [ref=e774]: 
+        - text: Kontakt aufnehmen
+  - contentinfo [ref=e775]:
+    - generic [ref=e776]:
+      - paragraph [ref=e777]: © 2014–2026 Torben Buck
+      - generic [ref=e778]:
+        - link "Sicherer Kanal" [ref=e779] [cursor=pointer]:
+          - /url: /secure
+        - link "Datenschutz" [ref=e780] [cursor=pointer]:
+          - /url: /datenschutz
+        - link "Impressum" [ref=e781] [cursor=pointer]:
+          - /url: /impressum
+  - generic:
+    - generic: 
+    - generic: Nachricht gesendet. Ich melde mich schnellstmöglich.
+  - generic [ref=e784]:
+    - button "Menu" [ref=e785]:
+      - img [ref=e787]
+      - generic: Menu
+    - button "Inspect" [ref=e791]:
+      - img [ref=e793]
+      - generic: Inspect
+    - button "Audit" [ref=e795]:
+      - generic [ref=e796]:
+        - img [ref=e797]
+        - img [ref=e800]
+      - generic: Audit
+    - button "Settings" [ref=e803]:
+      - img [ref=e805]
+      - generic: Settings
