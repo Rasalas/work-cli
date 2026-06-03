@@ -96,6 +96,43 @@ func TestTodayProjectDurationsGroupsByProject(t *testing.T) {
 	}
 }
 
+func TestPrintTodayProjectsUsesDynamicProjectNameWidth(t *testing.T) {
+	base := time.Date(2026, 5, 25, 15, 0, 0, 0, time.Local)
+	sessions := []db.Session{
+		{
+			ProjectName: sql.NullString{String: "thk", Valid: true},
+			StartedAt:   base,
+			EndedAt:     sql.NullTime{Time: base.Add(2 * time.Hour), Valid: true},
+		},
+		{
+			ProjectName: sql.NullString{String: "huntreport", Valid: true},
+			StartedAt:   base.Add(3 * time.Hour),
+			EndedAt:     sql.NullTime{Time: base.Add(3*time.Hour + 30*time.Minute), Valid: true},
+		},
+	}
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	printTodayProjects(sessions, base.Add(4*time.Hour))
+
+	output := buf.String()
+	if strings.Contains(output, "\n         thk") {
+		t.Fatalf("output uses fixed status key indentation for project name: %q", output)
+	}
+	for _, want := range []string{
+		"\n  thk         2h",
+		"\n  huntreport  30m",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q: %q", want, output)
+		}
+	}
+}
+
 func TestPrintTodayNotesPrintsProjectTitleOnProjectChange(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

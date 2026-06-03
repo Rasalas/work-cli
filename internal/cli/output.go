@@ -35,6 +35,12 @@ var (
 			Foreground(lipgloss.Color("246"))
 	noteKindStyle = metaStyle.
 			Width(noteKindWidth)
+	startEventStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")).
+			Bold(true)
+	stopEventStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("203")).
+			Bold(true)
 	valueStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252"))
 	sectionStyle = lipgloss.NewStyle().
@@ -96,6 +102,13 @@ func line(key, value string) string {
 	return keyStyle.Render(key) + "  " + valueStyle.Render(value)
 }
 
+func lineWithLeftKeyWidth(key, value string, keyWidth int) string {
+	if key == "" {
+		return valueStyle.Render(value)
+	}
+	return metaStyle.Width(keyWidth).Align(lipgloss.Left).Render(key) + "  " + valueStyle.Render(value)
+}
+
 func badgeLine(badge, value string) string {
 	return accentStyle.Render(badge) + "  " + valueStyle.Render(value)
 }
@@ -106,6 +119,17 @@ func noteLine(note db.Note) string {
 		noteKindStyle.Render(note.Kind) +
 		"  " +
 		valueStyle.Render(note.Body)
+}
+
+func boundaryNoteKind(kind string) string {
+	switch kind {
+	case "start":
+		return startEventStyle.Render(kind)
+	case "stop":
+		return stopEventStyle.Render(kind)
+	default:
+		return metaStyle.Render(kind)
+	}
 }
 
 func formatDateTime(t time.Time) string {

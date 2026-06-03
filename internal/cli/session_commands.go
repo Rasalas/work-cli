@@ -338,10 +338,25 @@ func printTodayProjects(sessions []db.Session, now time.Time) {
 		return
 	}
 	printSection("projects")
+	nameWidth := projectDurationNameWidth(durations)
 	for _, project := range durations {
-		printLine(line(project.Name, formatDuration(project.Duration)))
+		printLine(projectDurationLine(project, nameWidth))
 	}
 	fmt.Fprintln(out)
+}
+
+func projectDurationNameWidth(durations []projectDuration) int {
+	width := 0
+	for _, project := range durations {
+		if len(project.Name) > width {
+			width = len(project.Name)
+		}
+	}
+	return width
+}
+
+func projectDurationLine(project projectDuration, nameWidth int) string {
+	return lineWithLeftKeyWidth(project.Name, formatDuration(project.Duration), nameWidth)
 }
 
 type projectNotes struct {
@@ -437,7 +452,7 @@ func hasMultipleNoteProjects(groups []projectNotes) bool {
 func noteEventLine(event noteEvent) string {
 	prefix := metaStyle.Render(formatClock(event.At)) + "  "
 	if event.Body == "" {
-		return prefix + metaStyle.Render(event.Kind)
+		return prefix + boundaryNoteKind(event.Kind)
 	}
 	return prefix +
 		noteKindStyle.Render(event.Kind) +
