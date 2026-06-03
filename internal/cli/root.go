@@ -14,7 +14,6 @@ type options struct {
 	target    string
 	today     bool
 	week      bool
-	timeline  bool
 }
 
 func Execute() {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -265,18 +266,16 @@ func statusCmd() *cobra.Command {
 				lines = appendTargetStatusLine(lines, target, today.Work, now, false)
 				printBlock(lines...)
 				printTodayProjects(today.Sessions, now)
-				if opts.timeline {
-					printTimeline(today.Sessions, now)
-				}
-				last, err := store.LastSession(ctx)
-				if err != nil {
-					return err
-				}
-				if last != nil {
-					printMuted(
-						line("last", fmt.Sprintf("%s - %s", formatDateTime(last.StartedAt), formatEnd(last))),
-						line("", formatSessionDuration(*last, now)),
-					)
+				if len(today.Sessions) == 0 {
+					last, err := store.LastSession(ctx)
+					if err != nil {
+						return err
+					}
+					if last != nil {
+						printMuted(
+							line("last", fmt.Sprintf("%s - %s  %s", formatDateTime(last.StartedAt), formatEnd(last), formatSessionDuration(*last, now))),
+						)
+					}
 				}
 				if err := printTodayNotes(ctx, store, today.Sessions); err != nil {
 					return err
@@ -298,14 +297,9 @@ func statusCmd() *cobra.Command {
 			lines = appendTargetStatusLine(lines, target, today.Work, now, true)
 			printBlock(lines...)
 			printTodayProjects(today.Sessions, now)
-			if opts.timeline {
-				printTimeline(today.Sessions, now)
-			}
 			return printTodayNotes(ctx, store, today.Sessions)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.timeline, "timeline", false, "show today's session timeline")
-	cmd.Flags().BoolVar(&opts.timeline, "detail", false, "show today's session timeline")
 	cmd.Flags().StringVar(&opts.target, "target", "", "show when today's work target will be reached")
 	return cmd
 }
@@ -350,37 +344,105 @@ func printTodayProjects(sessions []db.Session, now time.Time) {
 	fmt.Fprintln(out)
 }
 
-func printTodayNotes(ctx context.Context, store *db.Store, sessions []db.Session) error {
-	printed := false
-	currentProject := ""
+type projectNotes struct {
+	Project string
+	Events  []noteEvent
+}
+
+type noteEvent struct {
+	At    time.Time
+	Kind  string
+	Body  string
+	Order int
+}
+
+func todayNotes(ctx context.Context, store *db.Store, sessions []db.Session) ([]projectNotes, error) {
+	var groups []projectNotes
 	for _, session := range sessions {
+		events := []noteEvent{
+			{At: session.StartedAt, Kind: "start", Order: 0},
+		}
 		sessionNotes, err := store.NotesForSession(ctx, session.ID)
 		if err != nil {
-			return err
-		}
-		if len(sessionNotes) == 0 {
-			continue
-		}
-		if !printed {
-			printSection("notes")
-			printed = true
-		}
-		project := sessionProjectTitle(session)
-		if project != currentProject {
-			if currentProject != "" {
-				fmt.Fprintln(out)
-			}
-			printLine(line("", project))
-			currentProject = project
+			return nil, err
 		}
 		for _, note := range sessionNotes {
-			printLine(noteLine(note))
+			events = append(events, noteEvent{
+				At:    note.CreatedAt,
+				Kind:  note.Kind,
+				Body:  note.Body,
+				Order: 1,
+			})
+		}
+		if session.EndedAt.Valid {
+			events = append(events, noteEvent{
+				At:    session.EndedAt.Time,
+				Kind:  "stop",
+				Order: 2,
+			})
+		}
+		sort.SliceStable(events, func(i, j int) bool {
+			if events[i].At.Equal(events[j].At) {
+				return events[i].Order < events[j].Order
+			}
+			return events[i].At.Before(events[j].At)
+		})
+		project := sessionProjectTitle(session)
+		if len(groups) > 0 && groups[len(groups)-1].Project == project {
+			groups[len(groups)-1].Events = append(groups[len(groups)-1].Events, events...)
+			continue
+		}
+		groups = append(groups, projectNotes{Project: project, Events: events})
+	}
+	return groups, nil
+}
+
+func printTodayNotes(ctx context.Context, store *db.Store, sessions []db.Session) error {
+	groups, err := todayNotes(ctx, store, sessions)
+	if err != nil {
+		return err
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+
+	printSection("notes")
+	showProjects := hasMultipleNoteProjects(groups)
+	for i, group := range groups {
+		if showProjects {
+			if i > 0 {
+				fmt.Fprintln(out)
+			}
+			printLine(line("", group.Project))
+		}
+		for _, event := range group.Events {
+			printLine(noteEventLine(event))
 		}
 	}
-	if printed {
-		fmt.Fprintln(out)
-	}
+	fmt.Fprintln(out)
 	return nil
+}
+
+func hasMultipleNoteProjects(groups []projectNotes) bool {
+	seen := make(map[string]bool)
+	for _, group := range groups {
+		seen[group.Project] = true
+		if len(seen) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func noteEventLine(event noteEvent) string {
+	prefix := metaStyle.Render(formatClock(event.At)) + "  "
+	if event.Body == "" {
+		return prefix + metaStyle.Render(event.Kind)
+	}
+	return prefix +
+		noteKindStyle.Render(event.Kind) +
+		"  " +
+		valueStyle.Render(event.Body)
 }
 
 func sessionProjectTitle(session db.Session) string {
@@ -391,7 +453,7 @@ func sessionProjectTitle(session db.Session) string {
 }
 
 func appendTodaySummaryLines(lines []string, summary daySummaryInfo, running *db.Session, includeToday bool) []string {
-	if summary.First.Valid && (running == nil || !summary.First.Time.Equal(running.StartedAt)) {
+	if len(summary.Sessions) > 1 && summary.First.Valid && (running == nil || !summary.First.Time.Equal(running.StartedAt)) {
 		lines = append(lines, line("first", formatDateTime(summary.First.Time)))
 	}
 	if includeToday {
@@ -415,25 +477,4 @@ func appendTargetStatusLine(lines []string, target, worked time.Duration, now ti
 		return append(lines, line("until", formatClock(now.Add(remaining))))
 	}
 	return append(lines, line("left", formatDuration(remaining)))
-}
-
-func printTimeline(sessions []db.Session, now time.Time) {
-	if len(sessions) == 0 {
-		return
-	}
-	printSection("timeline")
-	for _, session := range sessions {
-		printLine(line("", timelineSessionValue(session, now)))
-	}
-	fmt.Fprintln(out)
-}
-
-func timelineSessionValue(session db.Session, now time.Time) string {
-	end := now
-	endText := "now"
-	if session.EndedAt.Valid {
-		end = session.EndedAt.Time
-		endText = formatClock(end)
-	}
-	return fmt.Sprintf("%s - %s  %s", formatClock(session.StartedAt), endText, formatDuration(end.Sub(session.StartedAt)))
 }

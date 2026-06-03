@@ -134,8 +134,171 @@ func TestPrintTodayNotesPrintsProjectTitleOnProjectChange(t *testing.T) {
 	if got, want := strings.Count(output, "  admin  \n"), 1; got != want {
 		t.Fatalf("admin title count = %d, want %d; output = %q", got, want, output)
 	}
-	if !strings.Contains(output, "first hunt note  \n\n  admin") {
+	if !strings.Contains(output, "09:00  stop  \n\n  admin") {
 		t.Fatalf("output does not separate project titles with a blank line: %q", output)
+	}
+}
+
+func TestPrintTodayNotesIncludesSessionStartAndStop(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	base := time.Date(2026, 5, 25, 15, 0, 0, 0, time.Local)
+	thk := addProject(t, store, "thk")
+
+	startSessionWithProject(t, store, base, thk.ID)
+	addNote(t, store, "do", "fix doc merge to stage -> main", base)
+	addNote(t, store, "doing", "make pipelines more robust", base.Add(time.Hour))
+	endSession(t, store, base.Add(2*time.Hour))
+
+	summary, err := todaySummary(ctx, store, base.Add(3*time.Hour))
+	if err != nil {
+		t.Fatalf("todaySummary() error = %v", err)
+	}
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	if err := printTodayNotes(ctx, store, summary.Sessions); err != nil {
+		t.Fatalf("printTodayNotes() error = %v", err)
+	}
+
+	output := buf.String()
+	for _, want := range []string{
+		"15:00  start",
+		"15:00  do     fix doc merge to stage -> main",
+		"16:00  doing  make pipelines more robust",
+		"17:00  stop",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q: %q", want, output)
+		}
+	}
+	assertOutputOrder(t, output, []string{
+		"15:00  start",
+		"15:00  do     fix doc merge to stage -> main",
+		"16:00  doing  make pipelines more robust",
+		"17:00  stop",
+	})
+}
+
+func TestPrintTodayNotesOmitsProjectTitleForSingleProject(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+	thk := addProject(t, store, "thk")
+
+	startSessionWithProject(t, store, base, thk.ID)
+	addNote(t, store, "done", "fixed issue", base.Add(time.Hour))
+	endSession(t, store, base.Add(time.Hour))
+
+	summary, err := todaySummary(ctx, store, base.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("todaySummary() error = %v", err)
+	}
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	if err := printTodayNotes(ctx, store, summary.Sessions); err != nil {
+		t.Fatalf("printTodayNotes() error = %v", err)
+	}
+
+	output := buf.String()
+	if strings.Contains(output, "  thk  \n") {
+		t.Fatalf("output includes redundant project title: %q", output)
+	}
+	if !strings.Contains(output, "09:00  done   fixed issue") {
+		t.Fatalf("output does not include note: %q", output)
+	}
+}
+
+func TestPrintTodayNotesOmitsStopForRunningSession(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+
+	if _, err := store.StartSession(ctx, base, nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	summary, err := todaySummary(ctx, store, base.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("todaySummary() error = %v", err)
+	}
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	if err := printTodayNotes(ctx, store, summary.Sessions); err != nil {
+		t.Fatalf("printTodayNotes() error = %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "08:00  start") {
+		t.Fatalf("output does not include start: %q", output)
+	}
+	if strings.Contains(output, "stop") {
+		t.Fatalf("output includes stop for running session: %q", output)
+	}
+}
+
+func TestStatusRejectsRemovedDetailFlags(t *testing.T) {
+	for _, flag := range []string{"--timeline", "--detail"} {
+		t.Run(flag, func(t *testing.T) {
+			cmd := rootCmd()
+			cmd.SetArgs([]string{"status", flag})
+
+			err := cmd.Execute()
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want unknown flag")
+			}
+			if !strings.Contains(err.Error(), "unknown flag: "+flag) {
+				t.Fatalf("Execute() error = %q, want unknown flag for %s", err, flag)
+			}
+		})
+	}
+}
+
+func TestAppendTodaySummaryLinesOmitsFirstForSingleSession(t *testing.T) {
+	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+	summary := daySummaryInfo{
+		Sessions: []db.Session{{StartedAt: base}},
+		First:    sql.NullTime{Time: base, Valid: true},
+		Work:     time.Hour,
+	}
+
+	lines := appendTodaySummaryLines(nil, summary, nil, false)
+
+	for _, line := range lines {
+		if strings.Contains(line, "first") {
+			t.Fatalf("lines include first for a single session: %#v", lines)
+		}
+	}
+}
+
+func TestAppendTodaySummaryLinesShowsFirstForMultipleIdleSessions(t *testing.T) {
+	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
+	summary := daySummaryInfo{
+		Sessions: []db.Session{
+			{StartedAt: base},
+			{StartedAt: base.Add(2 * time.Hour)},
+		},
+		First: sql.NullTime{Time: base, Valid: true},
+		Work:  time.Hour,
+	}
+
+	lines := appendTodaySummaryLines(nil, summary, nil, false)
+
+	if got := strings.Join(lines, "\n"); !strings.Contains(got, "first") {
+		t.Fatalf("lines do not include first for multiple sessions: %#v", lines)
 	}
 }
 
@@ -288,5 +451,20 @@ func endSession(t *testing.T, store *db.Store, end time.Time) {
 	t.Helper()
 	if _, err := store.EndRunningSession(context.Background(), end, ""); err != nil {
 		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+}
+
+func assertOutputOrder(t *testing.T, output string, wants []string) {
+	t.Helper()
+	previous := -1
+	for _, want := range wants {
+		index := strings.Index(output, want)
+		if index == -1 {
+			t.Fatalf("output missing %q: %q", want, output)
+		}
+		if index < previous {
+			t.Fatalf("%q appears out of order in output: %q", want, output)
+		}
+		previous = index
 	}
 }
