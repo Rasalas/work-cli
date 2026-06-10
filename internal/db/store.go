@@ -23,6 +23,13 @@ type Project struct {
 	Archived  bool
 }
 
+type ProjectSchedule struct {
+	ProjectID     int64
+	WeeklyTarget  time.Duration
+	Workdays      string
+	LastUpdatedAt time.Time
+}
+
 type Session struct {
 	ID          int64
 	ProjectID   sql.NullInt64
@@ -115,9 +122,26 @@ CREATE TABLE IF NOT EXISTS notes (
 	created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_schedules (
+	project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+	weekly_target_minutes INTEGER NOT NULL,
+	workdays TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS project_balance_adjustments (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	adjustment_date TEXT NOT NULL,
+	minutes INTEGER NOT NULL,
+	note TEXT NOT NULL,
+	created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_open ON sessions(ended_at) WHERE ended_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_notes_session_id ON notes(session_id);
+CREATE INDEX IF NOT EXISTS idx_project_balance_adjustments_project_id ON project_balance_adjustments(project_id);
 `)
 	return err
 }
@@ -171,6 +195,71 @@ ORDER BY lower(name)
 		projects = append(projects, project)
 	}
 	return projects, rows.Err()
+}
+
+func (s *Store) SetProjectSchedule(ctx context.Context, projectID int64, weeklyTarget time.Duration, workdays string) error {
+	now := time.Now()
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO project_schedules (project_id, weekly_target_minutes, workdays, updated_at)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(project_id) DO UPDATE SET
+	weekly_target_minutes = excluded.weekly_target_minutes,
+	workdays = excluded.workdays,
+	updated_at = excluded.updated_at
+`, projectID, durationMinutes(weeklyTarget), workdays, formatTime(now))
+	return err
+}
+
+func (s *Store) ProjectSchedule(ctx context.Context, projectID int64) (*ProjectSchedule, error) {
+	var schedule ProjectSchedule
+	var weeklyMinutes int64
+	err := s.db.QueryRowContext(ctx, `
+SELECT project_id, weekly_target_minutes, workdays, updated_at
+FROM project_schedules
+WHERE project_id = ?
+`, projectID).Scan(
+		&schedule.ProjectID,
+		&weeklyMinutes,
+		&schedule.Workdays,
+		parseScanner(&schedule.LastUpdatedAt),
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	schedule.WeeklyTarget = time.Duration(weeklyMinutes) * time.Minute
+	return &schedule, nil
+}
+
+func (s *Store) SetProjectBalance(ctx context.Context, projectID int64, date time.Time, balance time.Duration) error {
+	current, err := s.ProjectBalance(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	delta := durationMinutes(balance - current)
+	if delta == 0 {
+		return nil
+	}
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO project_balance_adjustments (project_id, adjustment_date, minutes, note, created_at)
+VALUES (?, ?, ?, 'set balance', ?)
+`, projectID, date.Local().Format("2006-01-02"), delta, formatTime(time.Now()))
+	return err
+}
+
+func (s *Store) ProjectBalance(ctx context.Context, projectID int64) (time.Duration, error) {
+	var minutes int64
+	err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(minutes), 0)
+FROM project_balance_adjustments
+WHERE project_id = ?
+`, projectID).Scan(&minutes)
+	if err != nil {
+		return 0, err
+	}
+	return time.Duration(minutes) * time.Minute, nil
 }
 
 func (s *Store) StartSession(ctx context.Context, startedAt time.Time, projectID *int64) (Session, error) {
@@ -474,6 +563,10 @@ ORDER BY s.started_at DESC, s.id DESC
 
 func formatTime(t time.Time) string {
 	return t.Format(time.RFC3339)
+}
+
+func durationMinutes(duration time.Duration) int64 {
+	return int64(duration.Round(time.Minute) / time.Minute)
 }
 
 type timeScanner struct {
