@@ -266,6 +266,9 @@ func statusCmd() *cobra.Command {
 				lines = appendTargetStatusLine(lines, target, today.Work, now, false)
 				printBlock(lines...)
 				printTodayProjects(today.Sessions, now)
+				if err := printStatusWeek(ctx, store, today, nil, now); err != nil {
+					return err
+				}
 				if len(today.Sessions) == 0 {
 					last, err := store.LastSession(ctx)
 					if err != nil {
@@ -297,6 +300,9 @@ func statusCmd() *cobra.Command {
 			lines = appendTargetStatusLine(lines, target, today.Work, now, true)
 			printBlock(lines...)
 			printTodayProjects(today.Sessions, now)
+			if err := printStatusWeek(ctx, store, today, running, now); err != nil {
+				return err
+			}
 			return printTodayNotes(ctx, store, today.Sessions)
 		},
 	}
@@ -357,6 +363,87 @@ func projectDurationNameWidth(durations []projectDuration) int {
 
 func projectDurationLine(project projectDuration, nameWidth int) string {
 	return lineWithLeftKeyWidth(project.Name, formatDuration(project.Duration), nameWidth)
+}
+
+func printStatusWeek(ctx context.Context, store *db.Store, today daySummaryInfo, running *db.Session, now time.Time) error {
+	projects, err := statusWeekProjects(ctx, store, today, running)
+	if err != nil {
+		return err
+	}
+	var groups [][]string
+	for _, project := range projects {
+		schedule, err := store.ProjectSchedule(ctx, project.ID)
+		if err != nil {
+			return err
+		}
+		if schedule == nil {
+			continue
+		}
+		info, err := loadProjectWeekInfo(ctx, store, project, now, now)
+		if err != nil {
+			return err
+		}
+		groups = append(groups, statusProjectWeekLines(info, now))
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+
+	printSection("weekly")
+	for i, group := range groups {
+		if i > 0 {
+			fmt.Fprintln(out)
+		}
+		for _, text := range group {
+			printLine(text)
+		}
+	}
+	fmt.Fprintln(out)
+	return nil
+}
+
+func statusWeekProjects(ctx context.Context, store *db.Store, today daySummaryInfo, running *db.Session) ([]db.Project, error) {
+	seen := make(map[int64]bool)
+	var projects []db.Project
+	add := func(session db.Session) {
+		if !session.ProjectID.Valid || seen[session.ProjectID.Int64] {
+			return
+		}
+		seen[session.ProjectID.Int64] = true
+		name := ""
+		if session.ProjectName.Valid {
+			name = session.ProjectName.String
+		}
+		projects = append(projects, db.Project{ID: session.ProjectID.Int64, Name: name})
+	}
+	if running != nil {
+		add(*running)
+	}
+	for _, session := range today.Sessions {
+		add(session)
+	}
+	if len(projects) > 0 {
+		return projects, nil
+	}
+
+	active, err := store.ActiveProjects(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var scheduled []db.Project
+	for _, project := range active {
+		schedule, err := store.ProjectSchedule(ctx, project.ID)
+		if err != nil {
+			return nil, err
+		}
+		if schedule != nil {
+			scheduled = append(scheduled, project)
+		}
+	}
+	if len(scheduled) == 1 {
+		return scheduled, nil
+	}
+	return nil, nil
 }
 
 type projectNotes struct {

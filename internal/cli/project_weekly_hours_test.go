@@ -49,6 +49,32 @@ func TestProjectBalanceSetShowsOvertimeBalance(t *testing.T) {
 	})
 }
 
+func TestProjectBalanceUsesOnlyActiveProjectWhenNameIsOmitted(t *testing.T) {
+	useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+
+	output := runWorkCommand(t, "project", "balance", "--set", "80h")
+
+	assertOutputContains(t, output, []string{
+		"someproject",
+		"balance",
+		"+80h",
+	})
+}
+
+func TestProjectBalanceMissingProjectNameUsesActionableError(t *testing.T) {
+	useTempWorkDB(t)
+
+	err := runWorkCommandError("project", "balance")
+	if err == nil {
+		t.Fatal("work project balance error = nil, want missing project name")
+	}
+	if got := err.Error(); !strings.Contains(got, "missing project name") || !strings.Contains(got, "work project balance <projectname>") {
+		t.Fatalf("error = %q, want actionable missing project name guidance", got)
+	}
+}
+
 func TestWeekCommandShowsProjectTargetProgressAndPlannedOvertimeBurnDown(t *testing.T) {
 	dbPath := useTempWorkDB(t)
 
@@ -85,7 +111,9 @@ func TestWeekCommandShowsProjectTargetProgressAndPlannedOvertimeBurnDown(t *test
 		"10h / 20h",
 		"left",
 		"10h",
-		"workdays",
+		"schedule",
+		"Mon, Tue, Thu, Fri",
+		"remaining",
 		"Thu, Fri",
 		"per day",
 		"5h",
@@ -98,6 +126,72 @@ func TestWeekCommandShowsProjectTargetProgressAndPlannedOvertimeBurnDown(t *test
 	if strings.Contains(output, "otherproject") {
 		t.Fatalf("week output includes another project's time: %q", output)
 	}
+}
+
+func TestWeekCommandUsesOnlyActiveProjectWhenProjectIsOmitted(t *testing.T) {
+	dbPath := useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "20h", "--workdays", "mon,tue,thu,fri")
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	project, err := store.ProjectByName(context.Background(), "someproject")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+	monday := time.Date(2026, 6, 8, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, monday, monday.Add(5*time.Hour))
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	output := runWorkCommand(t, "week", "--date", "2026-06-10")
+
+	assertOutputContains(t, output, []string{
+		"someproject",
+		"5h / 20h",
+	})
+}
+
+func TestStatusProjectWeekLinesShowTodayOvertimeAndRemainingWorkdays(t *testing.T) {
+	now := time.Date(2026, 6, 10, 17, 31, 0, 0, time.Local)
+	info := projectWeekInfo{
+		Project: db.Project{Name: "thk"},
+		Schedule: &db.ProjectSchedule{
+			WeeklyTarget: 20 * time.Hour,
+		},
+		Worked:            11*time.Hour + 16*time.Minute,
+		Left:              8*time.Hour + 44*time.Minute,
+		TodayWorked:       time.Hour + 6*time.Minute,
+		TodayTarget:       0,
+		TodayOvertime:     time.Hour + 6*time.Minute,
+		RemainingWorkdays: []time.Time{time.Date(2026, 6, 11, 0, 0, 0, 0, time.Local), time.Date(2026, 6, 12, 0, 0, 0, 0, time.Local)},
+		Balance:           78 * time.Hour,
+		Projected:         69*time.Hour + 16*time.Minute,
+	}
+
+	output := strings.Join(statusProjectWeekLines(info, now), "\n")
+
+	assertOutputContains(t, output, []string{
+		"thk",
+		"week",
+		"11h 16m / 20h",
+		"today",
+		"1h 6m / 0m",
+		"overtime",
+		"+1h 6m",
+		"remaining",
+		"Thu, Fri",
+		"per day",
+		"4h 22m",
+		"balance",
+		"+78h",
+		"projected",
+		"+69h 16m",
+	})
 }
 
 func useTempWorkDB(t *testing.T) string {
@@ -124,6 +218,12 @@ func runWorkCommand(t *testing.T, args ...string) string {
 		t.Fatalf("work %s failed: %v\noutput:\n%s", strings.Join(args, " "), err, buf.String())
 	}
 	return buf.String()
+}
+
+func runWorkCommandError(args ...string) error {
+	cmd := rootCmd()
+	cmd.SetArgs(args)
+	return cmd.Execute()
 }
 
 func addEndedProjectSessionForWeeklyTest(t *testing.T, store *db.Store, projectID int64, start, end time.Time) {

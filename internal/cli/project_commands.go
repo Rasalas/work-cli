@@ -84,8 +84,19 @@ func projectSetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <name>",
 		Short: "Set project planning defaults",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			store, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer store.Close()
+
+			ctx := context.Background()
+			project, err := resolveProjectCommandProject(ctx, store, args, "work project set <projectname> --weekly <duration> --workdays <days>")
+			if err != nil {
+				return err
+			}
 			if opts.weekly == "" {
 				return fmt.Errorf("--weekly is required")
 			}
@@ -97,18 +108,6 @@ func projectSetCmd() *cobra.Command {
 				return err
 			}
 			workdays, err := parseWorkdays(opts.workdays)
-			if err != nil {
-				return err
-			}
-
-			store, err := openStore()
-			if err != nil {
-				return err
-			}
-			defer store.Close()
-
-			ctx := context.Background()
-			project, err := resolveNamedProject(ctx, store, args[0])
 			if err != nil {
 				return err
 			}
@@ -136,7 +135,7 @@ func projectBalanceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "balance <name>",
 		Short: "Show or set project overtime balance",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := openStore()
 			if err != nil {
@@ -145,7 +144,7 @@ func projectBalanceCmd() *cobra.Command {
 			defer store.Close()
 
 			ctx := context.Background()
-			project, err := resolveNamedProject(ctx, store, args[0])
+			project, err := resolveProjectCommandProject(ctx, store, args, "work project balance <projectname> [--set <duration>]")
 			if err != nil {
 				return err
 			}
@@ -190,6 +189,31 @@ func projectListLine(project db.Project, schedule *db.ProjectSchedule) string {
 		return fmt.Sprintf("%s  %s/week", project.Name, formatDuration(schedule.WeeklyTarget))
 	}
 	return fmt.Sprintf("%s  %s/week  %s", project.Name, formatDuration(schedule.WeeklyTarget), formatWorkdayLabels(workdays))
+}
+
+func resolveProjectCommandProject(ctx context.Context, store *db.Store, args []string, usage string) (db.Project, error) {
+	if len(args) > 0 {
+		return resolveNamedProject(ctx, store, args[0])
+	}
+	projects, err := store.ActiveProjects(ctx)
+	if err != nil {
+		return db.Project{}, err
+	}
+	switch len(projects) {
+	case 0:
+		return db.Project{}, fmt.Errorf("missing project name; use `%s`", usage)
+	case 1:
+		return projects[0], nil
+	default:
+		picked, err := tui.PickProject(projects)
+		if err != nil {
+			return db.Project{}, err
+		}
+		if picked == nil {
+			return db.Project{}, fmt.Errorf("project selection cancelled")
+		}
+		return *picked, nil
+	}
 }
 
 func resolveProject(ctx context.Context, store *db.Store, opts options) (*int64, string, error) {
