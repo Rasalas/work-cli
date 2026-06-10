@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,6 +19,7 @@ func logCmd() *cobra.Command {
 		week    bool
 		project string
 		date    string
+		since   string
 	}
 	cmd := &cobra.Command{
 		Use:   "log",
@@ -31,8 +34,8 @@ func logCmd() *cobra.Command {
 
 			var from, to *time.Time
 			now := time.Now()
-			if selectedLogDateFilters(opts.today, opts.week, opts.date) > 1 {
-				return fmt.Errorf("use only one of --today, --week, or --date")
+			if selectedLogDateFilters(opts.today, opts.week, opts.date, opts.since) > 1 {
+				return fmt.Errorf("use only one of --today, --week, --date, or --since")
 			}
 			if opts.today {
 				start := dayStart(now)
@@ -49,6 +52,12 @@ func logCmd() *cobra.Command {
 				}
 				end := start.AddDate(0, 0, 1)
 				from, to = &start, &end
+			} else if opts.since != "" {
+				start, err := parseLogSince(opts.since, now)
+				if err != nil {
+					return err
+				}
+				from = &start
 			}
 
 			ctx := context.Background()
@@ -74,11 +83,12 @@ func logCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.today, "today", false, "show today's sessions")
 	cmd.Flags().BoolVar(&opts.week, "week", false, "show this week's sessions")
 	cmd.Flags().StringVar(&opts.date, "date", "", "show sessions for YYYY-MM-DD")
+	cmd.Flags().StringVar(&opts.since, "since", "", "show sessions since duration or YYYY-MM-DD")
 	cmd.Flags().StringVarP(&opts.project, "project", "p", "", "filter by project")
 	return cmd
 }
 
-func selectedLogDateFilters(today, week bool, date string) int {
+func selectedLogDateFilters(today, week bool, date, since string) int {
 	selected := 0
 	if today {
 		selected++
@@ -87,6 +97,9 @@ func selectedLogDateFilters(today, week bool, date string) int {
 		selected++
 	}
 	if date != "" {
+		selected++
+	}
+	if since != "" {
 		selected++
 	}
 	return selected
@@ -98,6 +111,46 @@ func parseLogDate(input string, location *time.Location) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid date %q; use YYYY-MM-DD", input)
 	}
 	return dayStart(parsed), nil
+}
+
+func parseLogSince(input string, now time.Time) (time.Time, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return time.Time{}, fmt.Errorf("since value is required")
+	}
+	if parsed, err := parseLogDate(input, now.Location()); err == nil {
+		return parsed, nil
+	}
+	if duration, err := time.ParseDuration(input); err == nil {
+		if duration <= 0 {
+			return time.Time{}, fmt.Errorf("since duration must be positive")
+		}
+		return now.Add(-duration), nil
+	}
+
+	lower := strings.ToLower(input)
+	for _, unit := range []struct {
+		suffix string
+		days   int
+	}{
+		{"days", 1},
+		{"day", 1},
+		{"d", 1},
+		{"weeks", 7},
+		{"week", 7},
+		{"w", 7},
+	} {
+		if strings.HasSuffix(lower, unit.suffix) {
+			countText := strings.TrimSpace(strings.TrimSuffix(lower, unit.suffix))
+			count, err := strconv.Atoi(countText)
+			if err != nil || count <= 0 {
+				return time.Time{}, fmt.Errorf("invalid since value %q", input)
+			}
+			return now.AddDate(0, 0, -count*unit.days), nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid since value %q; use duration like 14d, 2w, 336h, or YYYY-MM-DD", input)
 }
 
 func logSessionHeader(session db.Session, now time.Time) string {

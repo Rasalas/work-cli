@@ -49,6 +49,8 @@ work doing --session 1 --at start "Feiertag, gearbeitet wegen Release"
 work status
 work end 1402
 work log --today
+work log --since 14d
+work log --since 14d -p someproject
 work log --date 2026-05-25
 work edit 1 --end 1430
 work db path

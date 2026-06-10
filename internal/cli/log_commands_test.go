@@ -221,6 +221,139 @@ func TestLogCommandFiltersByDate(t *testing.T) {
 	}
 }
 
+func TestLogCommandFiltersBySince(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
+	t.Setenv("WORK_DB", dbPath)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	ctx := context.Background()
+	old := time.Now().AddDate(0, 0, -15).Add(-time.Hour)
+	if _, err := store.StartSession(ctx, old, nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, old.Add(time.Hour), "old work"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	recent := time.Now().AddDate(0, 0, -13)
+	if _, err := store.StartSession(ctx, recent, nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, recent.Add(time.Hour), "recent work"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"log", "--since", "14d"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "recent work") {
+		t.Fatalf("output = %q, want recent note", output)
+	}
+	if strings.Contains(output, "old work") {
+		t.Fatalf("output = %q, want old note filtered out", output)
+	}
+}
+
+func TestLogCommandFiltersBySinceAndProject(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
+	t.Setenv("WORK_DB", dbPath)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	ctx := context.Background()
+	project, err := store.AddProject(ctx, "someproject")
+	if err != nil {
+		t.Fatalf("AddProject() error = %v", err)
+	}
+	otherProject, err := store.AddProject(ctx, "otherproject")
+	if err != nil {
+		t.Fatalf("AddProject() error = %v", err)
+	}
+	recent := time.Now().AddDate(0, 0, -2)
+	if _, err := store.StartSession(ctx, recent, &project.ID); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, recent.Add(time.Hour), "matching project"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if _, err := store.StartSession(ctx, recent.Add(2*time.Hour), &otherProject.ID); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, recent.Add(3*time.Hour), "other project"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"log", "--since", "14d", "-p", "someproject"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "matching project") {
+		t.Fatalf("output = %q, want matching project note", output)
+	}
+	if strings.Contains(output, "other project") {
+		t.Fatalf("output = %q, want other project note filtered out", output)
+	}
+}
+
+func TestParseLogSince(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.Local)
+
+	tests := []struct {
+		name  string
+		input string
+		want  time.Time
+	}{
+		{name: "days shorthand", input: "14d", want: now.AddDate(0, 0, -14)},
+		{name: "weeks shorthand", input: "2w", want: now.AddDate(0, 0, -14)},
+		{name: "duration", input: "336h", want: now.Add(-336 * time.Hour)},
+		{name: "date", input: "2026-05-28", want: time.Date(2026, 5, 28, 0, 0, 0, 0, time.Local)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseLogSince(tt.input, now)
+			if err != nil {
+				t.Fatalf("parseLogSince() error = %v", err)
+			}
+			if !got.Equal(tt.want) {
+				t.Fatalf("parseLogSince() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLogNoteLineAlignsTimeWithDuration(t *testing.T) {
 	note := db.Note{
 		Kind:      "do",
