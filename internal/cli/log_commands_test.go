@@ -171,6 +171,45 @@ func TestLogCommandPrintsOldestSessionFirst(t *testing.T) {
 	}
 }
 
+func TestLsAliasPrintsLoggedSessions(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
+	t.Setenv("WORK_DB", dbPath)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	ctx := context.Background()
+	base := time.Date(2026, 5, 22, 8, 0, 0, 0, time.Local)
+	if _, err := store.StartSession(ctx, base, nil); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSession(ctx, base.Add(time.Hour), "listed"); err != nil {
+		t.Fatalf("EndRunningSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	var buf bytes.Buffer
+	oldOut := out
+	out = &buf
+	t.Cleanup(func() {
+		out = oldOut
+	})
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"ls"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if output := buf.String(); !strings.Contains(output, "listed") {
+		t.Fatalf("output = %q, want listed note", output)
+	}
+}
+
 func TestLogCommandFiltersByDate(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "work.sqlite")
 	t.Setenv("WORK_DB", dbPath)

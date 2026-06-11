@@ -156,7 +156,7 @@ func TestWeekCommandUsesOnlyActiveProjectWhenProjectIsOmitted(t *testing.T) {
 	})
 }
 
-func TestStatusProjectWeekLinesShowTodayOvertimeAndRemainingWorkdays(t *testing.T) {
+func TestStatusProjectWeekLinesShowTodayOvertimeWithoutWeekPlanningDetails(t *testing.T) {
 	now := time.Date(2026, 6, 10, 17, 31, 0, 0, time.Local)
 	info := projectWeekInfo{
 		Project: db.Project{Name: "thk"},
@@ -181,17 +181,52 @@ func TestStatusProjectWeekLinesShowTodayOvertimeAndRemainingWorkdays(t *testing.
 		"11h 16m / 20h",
 		"today",
 		"1h 6m / 0m",
-		"overtime",
+		"over today",
 		"+1h 6m",
-		"remaining",
-		"Thu, Fri",
-		"per day",
-		"4h 22m",
 		"balance",
 		"+78h",
-		"projected",
-		"+69h 16m",
 	})
+	for _, unwanted := range []string{"remaining", "per day", "projected"} {
+		if strings.Contains(output, unwanted) {
+			t.Fatalf("status output includes %q: %q", unwanted, output)
+		}
+	}
+}
+
+func TestLoadProjectWeekInfoKeepsTodayTargetStableAfterTodayWork(t *testing.T) {
+	dbPath := useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "20h", "--workdays", "thu,fri")
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+	project, err := store.ProjectByName(ctx, "someproject")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+
+	wednesday := time.Date(2026, 6, 10, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, wednesday, wednesday.Add(11*time.Hour+16*time.Minute))
+	thursday := time.Date(2026, 6, 11, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, thursday, thursday.Add(7*time.Hour+3*time.Minute))
+
+	info, err := loadProjectWeekInfo(ctx, store, project, thursday, thursday.Add(7*time.Hour+3*time.Minute))
+	if err != nil {
+		t.Fatalf("loadProjectWeekInfo() error = %v", err)
+	}
+
+	if got, want := info.TodayTarget, 4*time.Hour+22*time.Minute; got != want {
+		t.Fatalf("TodayTarget = %v, want %v", got, want)
+	}
+	if got, want := info.TodayOvertime, 2*time.Hour+41*time.Minute; got != want {
+		t.Fatalf("TodayOvertime = %v, want %v", got, want)
+	}
 }
 
 func useTempWorkDB(t *testing.T) string {

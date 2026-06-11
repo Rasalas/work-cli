@@ -304,6 +304,38 @@ func TestStatusRejectsRemovedDetailFlags(t *testing.T) {
 	}
 }
 
+func TestStatusRunningSessionOmitsRedundantDetailLines(t *testing.T) {
+	dbPath := useTempWorkDB(t)
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	project, err := store.AddProject(context.Background(), "someproject")
+	if err != nil {
+		t.Fatalf("AddProject() error = %v", err)
+	}
+	start := time.Now().Add(-45 * time.Minute)
+	if _, err := store.StartSession(context.Background(), start, &project.ID); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	output := runWorkCommand(t, "status")
+
+	if strings.Contains(output, "current") {
+		t.Fatalf("status output includes redundant current line: %q", output)
+	}
+	if strings.Contains(output, "today") {
+		t.Fatalf("status output includes redundant today line outside project totals: %q", output)
+	}
+	if got, want := strings.Count(output, "someproject"), 1; got != want {
+		t.Fatalf("project name count = %d, want %d; output = %q", got, want, output)
+	}
+}
+
 func TestAppendTodaySummaryLinesOmitsFirstForSingleSession(t *testing.T) {
 	base := time.Date(2026, 5, 25, 8, 0, 0, 0, time.Local)
 	summary := daySummaryInfo{

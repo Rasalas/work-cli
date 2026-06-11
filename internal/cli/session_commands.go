@@ -288,15 +288,7 @@ func statusCmd() *cobra.Command {
 
 			lines := []string{
 				badgeLine("running", formatDuration(now.Sub(running.StartedAt))),
-				"",
 			}
-			if running.ProjectName.Valid {
-				lines = append(lines, line("", running.ProjectName.String))
-			}
-			lines = append(lines,
-				line("current", formatDateTime(running.StartedAt)),
-			)
-			lines = appendTodaySummaryLines(lines, today, running, true)
 			lines = appendTargetStatusLine(lines, target, today.Work, now, true)
 			printBlock(lines...)
 			printTodayProjects(today.Sessions, now)

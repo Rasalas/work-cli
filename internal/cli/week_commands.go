@@ -116,7 +116,7 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		return projectWeekInfo{}, err
 	}
 	todayWorked := totalSessionDuration(todayProjectSessions(sessions, selected), now)
-	todayTarget := todayTarget(left, selected, remainingWorkdays)
+	todayTarget := todayTarget(schedule.WeeklyTarget, sessions, selected, remainingWorkdays, now)
 	todayLeft := todayTarget - todayWorked
 	if todayLeft < 0 {
 		todayLeft = 0
@@ -183,13 +183,28 @@ func remainingWeekWorkdays(selected, weekEnd time.Time, workdays []time.Weekday)
 	return remaining
 }
 
-func todayTarget(left time.Duration, selected time.Time, remainingWorkdays []time.Time) time.Duration {
+func todayTarget(weeklyTarget time.Duration, sessions []db.Session, selected time.Time, remainingWorkdays []time.Time, now time.Time) time.Duration {
 	for _, day := range remainingWorkdays {
 		if dayStart(day).Equal(dayStart(selected)) {
-			return perDayTarget(left, remainingWorkdays)
+			leftAtStartOfDay := weeklyTarget - totalSessionDuration(sessionsBeforeDay(sessions, selected), now)
+			if leftAtStartOfDay < 0 {
+				return 0
+			}
+			return perDayTarget(leftAtStartOfDay, remainingWorkdays)
 		}
 	}
 	return 0
+}
+
+func sessionsBeforeDay(sessions []db.Session, selected time.Time) []db.Session {
+	start := dayStart(selected)
+	var before []db.Session
+	for _, session := range sessions {
+		if session.StartedAt.Before(start) {
+			before = append(before, session)
+		}
+	}
+	return before
 }
 
 func perDayTarget(left time.Duration, remainingWorkdays []time.Time) time.Duration {
@@ -230,13 +245,10 @@ func statusProjectWeekLines(info projectWeekInfo, now time.Time) []string {
 		)
 	}
 	if info.TodayOvertime > 0 {
-		lines = append(lines, line("overtime", formatSignedDuration(info.TodayOvertime)))
+		lines = append(lines, line("over today", formatSignedDuration(info.TodayOvertime)))
 	}
 	lines = append(lines,
-		line("remaining", formatWeekdays(info.RemainingWorkdays)),
-		line("per day", formatDuration(perDayTarget(info.Left, info.RemainingWorkdays))),
 		line("balance", formatSignedDuration(info.Balance)),
-		line("projected", formatSignedDuration(info.Projected)),
 	)
 	return lines
 }

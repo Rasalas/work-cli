@@ -55,6 +55,12 @@ type SessionUpdate struct {
 	ClearProject bool
 }
 
+type NoteUpdate struct {
+	Kind      *string
+	Body      *string
+	CreatedAt *time.Time
+}
+
 var ErrAlreadyRunning = errors.New("a work session is already running")
 var ErrNoRunningSession = errors.New("no work session is running")
 
@@ -526,6 +532,49 @@ ORDER BY created_at ASC, id ASC
 		notes = append(notes, note)
 	}
 	return notes, rows.Err()
+}
+
+func (s *Store) NoteByID(ctx context.Context, id int64) (Note, error) {
+	var note Note
+	err := s.db.QueryRowContext(ctx, `
+SELECT id, session_id, kind, body, created_at
+FROM notes
+WHERE id = ?
+`, id).Scan(&note.ID, &note.SessionID, &note.Kind, &note.Body, parseScanner(&note.CreatedAt))
+	if err != nil {
+		return Note{}, err
+	}
+	return note, nil
+}
+
+func (s *Store) UpdateNote(ctx context.Context, id int64, update NoteUpdate) (Note, error) {
+	note, err := s.NoteByID(ctx, id)
+	if err != nil {
+		return Note{}, err
+	}
+
+	kind := note.Kind
+	if update.Kind != nil {
+		kind = *update.Kind
+	}
+	body := note.Body
+	if update.Body != nil {
+		body = *update.Body
+	}
+	createdAt := note.CreatedAt
+	if update.CreatedAt != nil {
+		createdAt = *update.CreatedAt
+	}
+
+	_, err = s.db.ExecContext(ctx, `
+UPDATE notes
+SET kind = ?, body = ?, created_at = ?
+WHERE id = ?
+`, kind, body, formatTime(createdAt), id)
+	if err != nil {
+		return Note{}, err
+	}
+	return s.NoteByID(ctx, id)
 }
 
 func (s *Store) sessions(ctx context.Context, where string, args []any) ([]Session, error) {

@@ -22,9 +22,10 @@ func logCmd() *cobra.Command {
 		since   string
 	}
 	cmd := &cobra.Command{
-		Use:   "log",
-		Short: "List logged sessions",
-		Args:  cobra.NoArgs,
+		Use:     "log",
+		Aliases: []string{"ls"},
+		Short:   "List logged sessions",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, err := openStore()
 			if err != nil {
