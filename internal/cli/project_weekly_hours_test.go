@@ -119,12 +119,88 @@ func TestWeekCommandShowsProjectTargetProgressAndPlannedOvertimeBurnDown(t *test
 		"5h",
 		"deadline",
 		"balance",
-		"+80h",
+		"+60h",
 		"projected",
-		"+70h",
+		"+50h",
 	})
 	if strings.Contains(output, "otherproject") {
 		t.Fatalf("week output includes another project's time: %q", output)
+	}
+}
+
+func TestLoadProjectWeekInfoAddsCompletedWeekOvertimeToBalance(t *testing.T) {
+	dbPath := useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "20h", "--workdays", "mon,tue,thu,fri")
+	runWorkCommand(t, "project", "balance", "someproject", "--set", "78h", "--date", "2026-06-10")
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+	project, err := store.ProjectByName(ctx, "someproject")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+
+	monday := time.Date(2026, 6, 8, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, monday, monday.Add(5*time.Hour))
+	tuesday := time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, tuesday, tuesday.Add(5*time.Hour))
+	thursday := time.Date(2026, 6, 11, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, thursday, thursday.Add(6*time.Hour))
+	friday := time.Date(2026, 6, 12, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, friday, friday.Add(7*time.Hour))
+
+	info, err := loadProjectWeekInfo(ctx, store, project, time.Date(2026, 6, 15, 8, 0, 0, 0, time.Local), time.Date(2026, 6, 15, 8, 0, 0, 0, time.Local))
+	if err != nil {
+		t.Fatalf("loadProjectWeekInfo() error = %v", err)
+	}
+
+	if got, want := info.Balance, 81*time.Hour; got != want {
+		t.Fatalf("Balance = %v, want %v", got, want)
+	}
+}
+
+func TestLoadProjectWeekInfoSubtractsCompletedWeekShortfallFromBalance(t *testing.T) {
+	dbPath := useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "20h", "--workdays", "mon,tue,thu,fri")
+	runWorkCommand(t, "project", "balance", "someproject", "--set", "78h", "--date", "2026-06-10")
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+	project, err := store.ProjectByName(ctx, "someproject")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+
+	monday := time.Date(2026, 6, 8, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, monday, monday.Add(4*time.Hour))
+	tuesday := time.Date(2026, 6, 9, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, tuesday, tuesday.Add(5*time.Hour))
+	thursday := time.Date(2026, 6, 11, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, thursday, thursday.Add(4*time.Hour))
+	friday := time.Date(2026, 6, 12, 8, 0, 0, 0, time.Local)
+	addEndedProjectSessionForWeeklyTest(t, store, project.ID, friday, friday.Add(5*time.Hour))
+
+	info, err := loadProjectWeekInfo(ctx, store, project, time.Date(2026, 6, 15, 8, 0, 0, 0, time.Local), time.Date(2026, 6, 15, 8, 0, 0, 0, time.Local))
+	if err != nil {
+		t.Fatalf("loadProjectWeekInfo() error = %v", err)
+	}
+
+	if got, want := info.Balance, 76*time.Hour; got != want {
+		t.Fatalf("Balance = %v, want %v", got, want)
 	}
 }
 

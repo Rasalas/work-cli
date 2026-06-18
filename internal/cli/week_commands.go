@@ -111,7 +111,7 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		left = 0
 	}
 	remainingWorkdays := remainingWeekWorkdays(selected, end, workdays)
-	balance, err := store.ProjectBalance(ctx, project.ID)
+	balance, err := store.ProjectBalanceAt(ctx, project.ID, selected)
 	if err != nil {
 		return projectWeekInfo{}, err
 	}

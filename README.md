@@ -117,8 +117,10 @@ projects exist, the CLI opens the project picker.
 - `remaining`: configured workdays still left in the selected week.
 - `per day`: remaining time split across the remaining workdays.
 - `deadline`: last remaining configured workday in the selected week.
-- `balance`: current stored overtime balance.
-- `projected`: expected balance at week end if no more time is logged.
+- `balance`: current overtime balance, including completed week deltas since
+  the last manual balance set.
+- `projected`: expected balance at the selected week end if no more time is
+  logged in that week.
 
 For example, with a `+78h` balance, `11h 16m` worked, and a `20h` weekly
 target, the projected balance is:
@@ -131,4 +133,4 @@ target, the projected balance is:
 targets. It includes today's project target, how long is left today, the time to
 work until when a target remains, the `over today` amount when the target is
 already exceeded or the selected day is not a configured workday, and the current
-overtime balance.
+overtime balance with completed weeks already applied.

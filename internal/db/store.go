@@ -240,7 +240,7 @@ WHERE project_id = ?
 }
 
 func (s *Store) SetProjectBalance(ctx context.Context, projectID int64, date time.Time, balance time.Duration) error {
-	current, err := s.ProjectBalance(ctx, projectID)
+	current, _, err := s.rawProjectBalance(ctx, projectID)
 	if err != nil {
 		return err
 	}
@@ -256,16 +256,90 @@ VALUES (?, ?, ?, 'set balance', ?)
 }
 
 func (s *Store) ProjectBalance(ctx context.Context, projectID int64) (time.Duration, error) {
-	var minutes int64
-	err := s.db.QueryRowContext(ctx, `
-SELECT COALESCE(SUM(minutes), 0)
-FROM project_balance_adjustments
-WHERE project_id = ?
-`, projectID).Scan(&minutes)
+	return s.ProjectBalanceAt(ctx, projectID, time.Now())
+}
+
+func (s *Store) ProjectBalanceAt(ctx context.Context, projectID int64, at time.Time) (time.Duration, error) {
+	balance, latestAdjustmentDate, err := s.rawProjectBalance(ctx, projectID)
 	if err != nil {
 		return 0, err
 	}
-	return time.Duration(minutes) * time.Minute, nil
+	schedule, err := s.ProjectSchedule(ctx, projectID)
+	if err != nil {
+		return 0, err
+	}
+	if schedule == nil {
+		return balance, nil
+	}
+
+	start := balanceWeekStart(schedule.LastUpdatedAt)
+	if latestAdjustmentDate.Valid {
+		parsed, err := time.ParseInLocation("2006-01-02", latestAdjustmentDate.String, time.Local)
+		if err != nil {
+			return 0, err
+		}
+		start = balanceWeekStart(parsed)
+	}
+	completedBefore := balanceWeekStart(at)
+	if !completedBefore.After(start) {
+		return balance, nil
+	}
+
+	delta, err := s.completedWeeklyBalanceDelta(ctx, projectID, start, completedBefore, schedule.WeeklyTarget)
+	if err != nil {
+		return 0, err
+	}
+	return balance + delta, nil
+}
+
+func (s *Store) rawProjectBalance(ctx context.Context, projectID int64) (time.Duration, sql.NullString, error) {
+	var minutes int64
+	var latestAdjustmentDate sql.NullString
+	err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(minutes), 0), MAX(adjustment_date)
+FROM project_balance_adjustments
+WHERE project_id = ?
+`, projectID).Scan(&minutes, &latestAdjustmentDate)
+	if err != nil {
+		return 0, sql.NullString{}, err
+	}
+	return time.Duration(minutes) * time.Minute, latestAdjustmentDate, nil
+}
+
+func (s *Store) completedWeeklyBalanceDelta(ctx context.Context, projectID int64, start, completedBefore time.Time, weeklyTarget time.Duration) (time.Duration, error) {
+	rows, err := s.db.QueryContext(ctx, `
+SELECT started_at, ended_at
+FROM sessions
+WHERE project_id = ?
+  AND started_at >= ?
+  AND started_at < ?
+  AND ended_at IS NOT NULL
+`, projectID, formatTime(start), formatTime(completedBefore))
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	workedByWeek := make(map[time.Time]time.Duration)
+	for rows.Next() {
+		var startedAt, endedAt time.Time
+		if err := rows.Scan(parseScanner(&startedAt), parseScanner(&endedAt)); err != nil {
+			return 0, err
+		}
+		if endedAt.After(startedAt) {
+			week := balanceWeekStart(startedAt)
+			workedByWeek[week] += endedAt.Sub(startedAt)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	var delta time.Duration
+	for week := start; week.Before(completedBefore); week = week.AddDate(0, 0, 7) {
+		delta += workedByWeek[week] - weeklyTarget
+	}
+	return delta, nil
 }
 
 func (s *Store) StartSession(ctx context.Context, startedAt time.Time, projectID *int64) (Session, error) {
@@ -616,6 +690,14 @@ func formatTime(t time.Time) string {
 
 func durationMinutes(duration time.Duration) int64 {
 	return int64(duration.Round(time.Minute) / time.Minute)
+}
+
+func balanceWeekStart(t time.Time) time.Time {
+	local := t.Local()
+	year, month, day := local.Date()
+	start := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	offset := (int(start.Weekday()) + 6) % 7
+	return start.AddDate(0, 0, -offset)
 }
 
 type timeScanner struct {
