@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -64,6 +65,15 @@ type OvertimeUsage struct {
 	CreatedAt time.Time
 }
 
+type ProjectAbsence struct {
+	ID        int64
+	ProjectID int64
+	Kind      string
+	StartsOn  time.Time
+	EndsOn    time.Time
+	CreatedAt time.Time
+}
+
 type SessionUpdate struct {
 	StartedAt    *time.Time
 	EndedAt      *time.Time
@@ -79,6 +89,7 @@ type NoteUpdate struct {
 
 var ErrAlreadyRunning = errors.New("a work session is already running")
 var ErrNoRunningSession = errors.New("no work session is running")
+var ErrOverlappingAbsence = errors.New("an overlapping absence already exists")
 
 func DefaultPath() (string, error) {
 	if path := os.Getenv("WORK_DB"); path != "" {
@@ -176,11 +187,22 @@ CREATE TABLE IF NOT EXISTS project_overtime_usages (
 	created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_absences (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	kind TEXT NOT NULL,
+	starts_on TEXT NOT NULL,
+	ends_on TEXT NOT NULL,
+	created_at TEXT NOT NULL,
+	CHECK (ends_on >= starts_on)
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_open ON sessions(ended_at) WHERE ended_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_notes_session_id ON notes(session_id);
 CREATE INDEX IF NOT EXISTS idx_project_balance_adjustments_project_id ON project_balance_adjustments(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_overtime_usages_project_date ON project_overtime_usages(project_id, used_on);
+CREATE INDEX IF NOT EXISTS idx_project_absences_project_dates ON project_absences(project_id, starts_on, ends_on);
 `)
 	return err
 }
@@ -358,7 +380,7 @@ func (s *Store) ProjectBalanceAt(ctx context.Context, projectID int64, at time.T
 		return balance - used, nil
 	}
 
-	delta, err := s.completedWeeklyBalanceDelta(ctx, projectID, start, completedBefore, schedule.WeeklyTarget)
+	delta, err := s.completedWeeklyBalanceDelta(ctx, projectID, start, completedBefore, *schedule)
 	if err != nil {
 		return 0, err
 	}
@@ -379,7 +401,7 @@ WHERE project_id = ?
 	return time.Duration(minutes) * time.Minute, latestAdjustmentDate, nil
 }
 
-func (s *Store) completedWeeklyBalanceDelta(ctx context.Context, projectID int64, start, completedBefore time.Time, weeklyTarget time.Duration) (time.Duration, error) {
+func (s *Store) completedWeeklyBalanceDelta(ctx context.Context, projectID int64, start, completedBefore time.Time, schedule ProjectSchedule) (time.Duration, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT started_at, ended_at
 FROM sessions
@@ -419,9 +441,13 @@ WHERE project_id = ?
 
 	var delta time.Duration
 	for week := start; week.Before(completedBefore); week = week.AddDate(0, 0, 7) {
-		delta += workedByWeek[week] + usedByWeek[week] - weeklyTarget
+		delta += workedByWeek[week] + usedByWeek[week] - schedule.WeeklyTarget
 	}
-	return delta, nil
+	absenceReduction, err := s.ProjectAbsenceTargetReduction(ctx, projectID, start, completedBefore, schedule.WeeklyTarget, schedule.Workdays)
+	if err != nil {
+		return 0, err
+	}
+	return delta + absenceReduction, nil
 }
 
 func (s *Store) StartSession(ctx context.Context, startedAt time.Time, projectID *int64) (Session, error) {
@@ -575,6 +601,146 @@ func (s *Store) ProjectOvertimeUsed(ctx context.Context, projectID int64, from, 
 		total += usage.Duration
 	}
 	return total, nil
+}
+
+func (s *Store) AddProjectAbsence(ctx context.Context, projectID int64, startsOn, endsOn time.Time, kind string) (ProjectAbsence, error) {
+	startsOn = localDate(startsOn)
+	endsOn = localDate(endsOn)
+	if endsOn.Before(startsOn) {
+		return ProjectAbsence{}, fmt.Errorf("absence end cannot be before start")
+	}
+	if kind == "" {
+		return ProjectAbsence{}, fmt.Errorf("absence type is required")
+	}
+
+	var overlap int
+	err := s.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM project_absences
+WHERE project_id = ?
+  AND starts_on <= ?
+  AND ends_on >= ?
+`, projectID, endsOn.Format("2006-01-02"), startsOn.Format("2006-01-02")).Scan(&overlap)
+	if err != nil {
+		return ProjectAbsence{}, err
+	}
+	if overlap > 0 {
+		return ProjectAbsence{}, ErrOverlappingAbsence
+	}
+
+	now := time.Now()
+	result, err := s.db.ExecContext(ctx, `
+INSERT INTO project_absences (project_id, kind, starts_on, ends_on, created_at)
+VALUES (?, ?, ?, ?, ?)
+`, projectID, kind, startsOn.Format("2006-01-02"), endsOn.Format("2006-01-02"), formatTime(now))
+	if err != nil {
+		return ProjectAbsence{}, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return ProjectAbsence{}, err
+	}
+	return ProjectAbsence{
+		ID:        id,
+		ProjectID: projectID,
+		Kind:      kind,
+		StartsOn:  startsOn,
+		EndsOn:    endsOn,
+		CreatedAt: now,
+	}, nil
+}
+
+func (s *Store) ProjectAbsences(ctx context.Context, projectID int64, from, to *time.Time) ([]ProjectAbsence, error) {
+	where := "WHERE project_id = ?"
+	args := []any{projectID}
+	if from != nil {
+		where += " AND ends_on >= ?"
+		args = append(args, localDate(*from).Format("2006-01-02"))
+	}
+	if to != nil {
+		where += " AND starts_on < ?"
+		args = append(args, localDate(*to).Format("2006-01-02"))
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, project_id, kind, starts_on, ends_on, created_at
+FROM project_absences
+`+where+`
+ORDER BY starts_on ASC, id ASC
+`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var absences []ProjectAbsence
+	for rows.Next() {
+		var absence ProjectAbsence
+		var startsOn, endsOn string
+		if err := rows.Scan(
+			&absence.ID,
+			&absence.ProjectID,
+			&absence.Kind,
+			&startsOn,
+			&endsOn,
+			parseScanner(&absence.CreatedAt),
+		); err != nil {
+			return nil, err
+		}
+		absence.StartsOn, err = time.ParseInLocation("2006-01-02", startsOn, time.Local)
+		if err != nil {
+			return nil, err
+		}
+		absence.EndsOn, err = time.ParseInLocation("2006-01-02", endsOn, time.Local)
+		if err != nil {
+			return nil, err
+		}
+		absences = append(absences, absence)
+	}
+	return absences, rows.Err()
+}
+
+func (s *Store) ProjectAbsentOn(ctx context.Context, projectID int64, date time.Time) (bool, error) {
+	start := localDate(date)
+	end := start.AddDate(0, 0, 1)
+	absences, err := s.ProjectAbsences(ctx, projectID, &start, &end)
+	if err != nil {
+		return false, err
+	}
+	return len(absences) > 0, nil
+}
+
+func (s *Store) ProjectAbsenceTargetReduction(ctx context.Context, projectID int64, from, to time.Time, weeklyTarget time.Duration, workdays string) (time.Duration, error) {
+	from = localDate(from)
+	to = localDate(to)
+	if !to.After(from) {
+		return 0, nil
+	}
+	scheduledDays := scheduledWeekdays(workdays)
+	if len(scheduledDays) == 0 {
+		return 0, nil
+	}
+	absences, err := s.ProjectAbsences(ctx, projectID, &from, &to)
+	if err != nil {
+		return 0, err
+	}
+	absentDates := make(map[string]bool)
+	for _, absence := range absences {
+		start := absence.StartsOn
+		if start.Before(from) {
+			start = from
+		}
+		end := absence.EndsOn.AddDate(0, 0, 1)
+		if end.After(to) {
+			end = to
+		}
+		for day := start; day.Before(end); day = day.AddDate(0, 0, 1) {
+			if scheduledDays[day.Weekday()] {
+				absentDates[day.Format("2006-01-02")] = true
+			}
+		}
+	}
+	dailyTarget := weeklyTarget / time.Duration(len(scheduledDays))
+	return time.Duration(len(absentDates)) * dailyTarget, nil
 }
 
 func (s *Store) AddNote(ctx context.Context, kind, body string, createdAt time.Time) (Note, error) {
@@ -869,6 +1035,34 @@ func endOfLocalDay(t time.Time) *time.Time {
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
 	end := start.AddDate(0, 0, 1)
 	return &end
+}
+
+func localDate(t time.Time) time.Time {
+	local := t.Local()
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+}
+
+func scheduledWeekdays(workdays string) map[time.Weekday]bool {
+	days := make(map[time.Weekday]bool)
+	for _, value := range strings.Split(workdays, ",") {
+		switch strings.TrimSpace(strings.ToLower(value)) {
+		case "mon":
+			days[time.Monday] = true
+		case "tue":
+			days[time.Tuesday] = true
+		case "wed":
+			days[time.Wednesday] = true
+		case "thu":
+			days[time.Thursday] = true
+		case "fri":
+			days[time.Friday] = true
+		case "sat":
+			days[time.Saturday] = true
+		case "sun":
+			days[time.Sunday] = true
+		}
+	}
+	return days
 }
 
 type timeScanner struct {

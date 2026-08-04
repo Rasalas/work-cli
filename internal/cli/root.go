@@ -31,6 +31,6 @@ func rootCmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 
-	cmd.AddCommand(startCmd(), noteCmd("do"), noteCmd("doing"), noteCmd("done"), noteAdminCmd(), endCmd(), editCmd(), deleteCmd(), statusCmd(), logCmd(), exportCmd(), weekCmd(), projectCmd(), dbCmd(), installCmd(), updateCmd(), uninstallCmd(), versionCmd(), internalCmd())
+	cmd.AddCommand(startCmd(), noteCmd("do"), noteCmd("doing"), noteCmd("done"), noteAdminCmd(), endCmd(), editCmd(), deleteCmd(), statusCmd(), logCmd(), exportCmd(), absenceCmd(), weekCmd(), projectCmd(), dbCmd(), installCmd(), updateCmd(), uninstallCmd(), versionCmd(), internalCmd())
 	return cmd
 }

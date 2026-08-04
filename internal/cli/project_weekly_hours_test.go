@@ -239,6 +239,7 @@ func TestStatusProjectWeekLinesShowTodayOvertimeWithoutWeekPlanningDetails(t *te
 		Schedule: &db.ProjectSchedule{
 			WeeklyTarget: 20 * time.Hour,
 		},
+		Target:            20 * time.Hour,
 		Worked:            11*time.Hour + 16*time.Minute,
 		Left:              8*time.Hour + 44*time.Minute,
 		TodayWorked:       time.Hour + 6*time.Minute,

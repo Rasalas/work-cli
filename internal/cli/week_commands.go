@@ -14,6 +14,8 @@ type projectWeekInfo struct {
 	Project           db.Project
 	Schedule          *db.ProjectSchedule
 	Workdays          []time.Weekday
+	Target            time.Duration
+	Absence           time.Duration
 	Worked            time.Duration
 	OvertimeUsed      time.Duration
 	Accounted         time.Duration
@@ -73,12 +75,15 @@ func weekCmd() *cobra.Command {
 
 			lines := []string{
 				badgeLine("project", project.Name),
-				line("week", formatDuration(info.Worked)+" / "+formatDuration(info.Schedule.WeeklyTarget)),
+				line("week", formatDuration(info.Worked)+" / "+formatDuration(info.Target)),
+			}
+			if info.Absence > 0 {
+				lines = append(lines, line("absence", formatDuration(info.Absence)))
 			}
 			if info.OvertimeUsed > 0 {
 				lines = append(lines,
 					line("overtime", formatDuration(info.OvertimeUsed)),
-					line("accounted", formatDuration(info.Accounted)+" / "+formatDuration(info.Schedule.WeeklyTarget)),
+					line("accounted", formatDuration(info.Accounted)+" / "+formatDuration(info.Target)),
 				)
 			}
 			lines = append(lines,
@@ -114,6 +119,19 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 
 	start := weekStart(selected)
 	end := start.AddDate(0, 0, 7)
+	absenceReduction, err := store.ProjectAbsenceTargetReduction(ctx, project.ID, start, end, schedule.WeeklyTarget, schedule.Workdays)
+	if err != nil {
+		return projectWeekInfo{}, err
+	}
+	target := schedule.WeeklyTarget - absenceReduction
+	if target < 0 {
+		target = 0
+	}
+	absences, err := store.ProjectAbsences(ctx, project.ID, &start, &end)
+	if err != nil {
+		return projectWeekInfo{}, err
+	}
+	absentDates := projectAbsentDateSet(absences, start, end)
 	sessions, err := store.LogSessions(ctx, &start, &end, project.Name)
 	if err != nil {
 		return projectWeekInfo{}, err
@@ -124,11 +142,12 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		return projectWeekInfo{}, err
 	}
 	accounted := worked + overtimeUsed
-	left := schedule.WeeklyTarget - accounted
+	left := target - accounted
 	if left < 0 {
 		left = 0
 	}
 	remainingWorkdays := remainingWeekWorkdays(selected, end, workdays)
+	remainingWorkdays = filterAbsentDates(remainingWorkdays, absentDates)
 	balance, err := store.ProjectBalanceAt(ctx, project.ID, selected)
 	if err != nil {
 		return projectWeekInfo{}, err
@@ -142,6 +161,9 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 	}
 	todayAccounted := todayWorked + todayOvertimeUsed
 	todayTarget := todayTarget(schedule.WeeklyTarget, selected, workdays)
+	if absentDates[dayStart(selected).Format("2006-01-02")] {
+		todayTarget = 0
+	}
 	todayLeft := todayTarget - todayAccounted
 	if todayLeft < 0 {
 		todayLeft = 0
@@ -155,6 +177,8 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		Project:           project,
 		Schedule:          schedule,
 		Workdays:          workdays,
+		Target:            target,
+		Absence:           absenceReduction,
 		Worked:            worked,
 		OvertimeUsed:      overtimeUsed,
 		Accounted:         accounted,
@@ -167,7 +191,7 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		TodayOvertime:     todayOvertime,
 		RemainingWorkdays: remainingWorkdays,
 		Balance:           balance,
-		Projected:         balance + accounted - schedule.WeeklyTarget,
+		Projected:         balance + accounted - target,
 	}, nil
 }
 
@@ -212,6 +236,34 @@ func remainingWeekWorkdays(selected, weekEnd time.Time, workdays []time.Weekday)
 	return remaining
 }
 
+func projectAbsentDateSet(absences []db.ProjectAbsence, from, to time.Time) map[string]bool {
+	dates := make(map[string]bool)
+	for _, absence := range absences {
+		start := absence.StartsOn
+		if start.Before(from) {
+			start = from
+		}
+		end := absence.EndsOn.AddDate(0, 0, 1)
+		if end.After(to) {
+			end = to
+		}
+		for day := start; day.Before(end); day = day.AddDate(0, 0, 1) {
+			dates[day.Format("2006-01-02")] = true
+		}
+	}
+	return dates
+}
+
+func filterAbsentDates(days []time.Time, absentDates map[string]bool) []time.Time {
+	var filtered []time.Time
+	for _, day := range days {
+		if !absentDates[day.Format("2006-01-02")] {
+			filtered = append(filtered, day)
+		}
+	}
+	return filtered
+}
+
 func todayTarget(weeklyTarget time.Duration, selected time.Time, workdays []time.Weekday) time.Duration {
 	if len(workdays) == 0 {
 		return 0
@@ -252,8 +304,11 @@ func formatDeadline(days []time.Time) string {
 func statusProjectWeekLines(info projectWeekInfo, now time.Time) []string {
 	lines := []string{
 		line("", info.Project.Name),
-		line("week", formatDuration(info.Worked)+" / "+formatDuration(info.Schedule.WeeklyTarget)),
+		line("week", formatDuration(info.Worked)+" / "+formatDuration(info.Target)),
 		line("today", formatDuration(info.TodayWorked)+" / "+formatDuration(info.TodayTarget)),
+	}
+	if info.Absence > 0 {
+		lines = append(lines, line("absence", formatDuration(info.Absence)))
 	}
 	if info.TodayOvertimeUsed > 0 {
 		lines = append(lines,

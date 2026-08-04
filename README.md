@@ -59,6 +59,8 @@ work log --since 14d
 work log --since 14d -p someproject
 work log --date 2026-05-25
 work week -p someproject
+work absence add -p someproject --from 2026-07-17 --to 2026-08-03 --type vacation
+work absence list -p someproject
 work export -p someproject --month 2026-08
 work export -p someproject --month 2026-08 --show-overtime
 work edit 1 --start 0806 --end 1430
@@ -172,6 +174,30 @@ weekly target across the configured workdays, how long is left for that planned
 target, the time to work until when a target remains, the `over today` amount
 when the target is already exceeded or the selected day is not a configured
 workday, and the current overtime balance with completed weeks already applied.
+
+## Absences
+
+Record vacation or another planned absence as an inclusive date range:
+
+```bash
+work absence add -p someproject \
+  --from 2026-07-17 \
+  --to 2026-08-03 \
+  --type vacation
+```
+
+Only configured project workdays reduce the target. Weekends and other
+non-workdays inside the range are ignored. A full absent workweek therefore has
+a zero-hour target and no longer reduces the overtime balance. Partial weeks
+reduce the target by the planned daily share for every absent workday.
+
+List recorded absences with:
+
+```bash
+work absence list -p someproject
+```
+
+Overlapping absence ranges for the same project are rejected.
 
 ## Export
 

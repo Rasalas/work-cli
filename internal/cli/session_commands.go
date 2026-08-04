@@ -315,6 +315,13 @@ func targetEndForSession(ctx context.Context, store *db.Store, running db.Sessio
 		return targetEndInfo{}, err
 	}
 	target := todayTarget(schedule.WeeklyTarget, running.StartedAt, workdays)
+	absent, err := store.ProjectAbsentOn(ctx, running.ProjectID.Int64, running.StartedAt)
+	if err != nil {
+		return targetEndInfo{}, err
+	}
+	if absent {
+		target = 0
+	}
 	if target == 0 {
 		return targetEndInfo{}, fmt.Errorf("project %q has no target on %s", running.ProjectName.String, workdayLabel(running.StartedAt.Weekday()))
 	}
@@ -372,6 +379,13 @@ func overtimeForEnd(ctx context.Context, store *db.Store, running db.Session, en
 		return 0, 0, 0, err
 	}
 	target := todayTarget(schedule.WeeklyTarget, endedAt, workdays)
+	absent, err := store.ProjectAbsentOn(ctx, running.ProjectID.Int64, endedAt)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if absent {
+		target = 0
+	}
 	if target == 0 {
 		return 0, 0, 0, fmt.Errorf("project %q has no target on %s", running.ProjectName.String, workdayLabel(endedAt.Weekday()))
 	}
