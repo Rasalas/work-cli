@@ -269,11 +269,11 @@ func TestStatusProjectWeekLinesShowTodayOvertimeWithoutWeekPlanningDetails(t *te
 	}
 }
 
-func TestLoadProjectWeekInfoKeepsTodayTargetStableAfterTodayWork(t *testing.T) {
+func TestLoadProjectWeekInfoUsesPlannedTodayTargetInsteadOfWeeklyCatchUp(t *testing.T) {
 	dbPath := useTempWorkDB(t)
 
 	runWorkCommand(t, "project", "add", "someproject")
-	runWorkCommand(t, "project", "set", "someproject", "--weekly", "20h", "--workdays", "thu,fri")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "20h", "--workdays", "wed,thu")
 
 	store, err := db.Open(dbPath)
 	if err != nil {
@@ -287,8 +287,6 @@ func TestLoadProjectWeekInfoKeepsTodayTargetStableAfterTodayWork(t *testing.T) {
 		t.Fatalf("ProjectByName() error = %v", err)
 	}
 
-	wednesday := time.Date(2026, 6, 10, 8, 0, 0, 0, time.Local)
-	addEndedProjectSessionForWeeklyTest(t, store, project.ID, wednesday, wednesday.Add(11*time.Hour+16*time.Minute))
 	thursday := time.Date(2026, 6, 11, 8, 0, 0, 0, time.Local)
 	addEndedProjectSessionForWeeklyTest(t, store, project.ID, thursday, thursday.Add(7*time.Hour+3*time.Minute))
 
@@ -297,10 +295,13 @@ func TestLoadProjectWeekInfoKeepsTodayTargetStableAfterTodayWork(t *testing.T) {
 		t.Fatalf("loadProjectWeekInfo() error = %v", err)
 	}
 
-	if got, want := info.TodayTarget, 4*time.Hour+22*time.Minute; got != want {
+	if got, want := info.TodayTarget, 10*time.Hour; got != want {
 		t.Fatalf("TodayTarget = %v, want %v", got, want)
 	}
-	if got, want := info.TodayOvertime, 2*time.Hour+41*time.Minute; got != want {
+	if got, want := info.TodayLeft, 2*time.Hour+57*time.Minute; got != want {
+		t.Fatalf("TodayLeft = %v, want %v", got, want)
+	}
+	if got, want := info.TodayOvertime, time.Duration(0); got != want {
 		t.Fatalf("TodayOvertime = %v, want %v", got, want)
 	}
 }

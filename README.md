@@ -51,11 +51,15 @@ work note ls 1
 work note edit 3 --at 1330
 work status
 work end 1402
+work end 1402 --use-overtime
+work end 1402 --use-overtime=1h
 work log --today
 work log --since 14d
 work log --since 14d -p someproject
 work log --date 2026-05-25
 work week -p someproject
+work export -p someproject --month 2026-08
+work export -p someproject --month 2026-08 --show-overtime
 work edit 1 --start 0806 --end 1430
 work db path
 ```
@@ -67,7 +71,7 @@ Set `WORK_DB` to use another path.
 
 ```bash
 work project add someproject
-work project set someproject --weekly 20h --workdays mon,tue,thu,fri
+work project set someproject --weekly 20h --workdays mon,tue,thu,fri --report-start 0800 --report-end 1300
 work project balance someproject --set 80h
 work project list
 work start 800
@@ -98,6 +102,22 @@ The optional `--date YYYY-MM-DD` flag records the balance adjustment date:
 ```bash
 work project balance someproject --set 80h --date 2026-06-03
 ```
+
+End a session early and use enough overtime to reach today's planned target:
+
+```bash
+work end 1400 --use-overtime
+```
+
+Use an explicit amount instead with the `=<duration>` form:
+
+```bash
+work end 1400 --use-overtime=1h
+```
+
+The session keeps its actual end time. Overtime use is stored separately,
+reduces the balance immediately, and counts toward the weekly target without
+being deducted a second time when the week completes.
 
 Show the weekly projection with:
 
@@ -130,7 +150,51 @@ target, the projected balance is:
 ```
 
 `work status` also shows a `weekly` section for projects with configured weekly
-targets. It includes today's project target, how long is left today, the time to
-work until when a target remains, the `over today` amount when the target is
-already exceeded or the selected day is not a configured workday, and the current
-overtime balance with completed weeks already applied.
+targets. It includes today's planned project target, calculated by spreading the
+weekly target across the configured workdays, how long is left for that planned
+target, the time to work until when a target remains, the `over today` amount
+when the target is already exceeded or the selected day is not a configured
+workday, and the current overtime balance with completed weeks already applied.
+
+## Export
+
+Configure the employer reporting window for a project. Reporting settings can
+be added independently of the weekly schedule:
+
+```bash
+work project set someproject --report-start 0800 --report-end 1300
+```
+
+Export the current month as CSV, or select a month or date explicitly:
+
+```bash
+work export -p someproject
+work export -p someproject --month 2026-08
+work export -p someproject --date 2026-08-04
+```
+
+The default export emits one compact employer-facing row per recorded day:
+
+```csv
+date,start,end,type,duration
+2026-08-04,08:00,13:00,work,05:00
+```
+
+Use `--show-overtime` to split the same reported interval into work and
+overtime-use rows while keeping the CSV columns and total interval unchanged:
+
+```bash
+work export -p someproject --month 2026-08 --show-overtime
+```
+
+```csv
+date,start,end,type,duration
+2026-08-04,08:00,11:30,work,03:30
+2026-08-04,11:30,13:00,overtime_use,01:30
+```
+
+Redirect stdout to save the export:
+
+```bash
+work export -p someproject --month 2026-08 > work-2026-08.csv
+```

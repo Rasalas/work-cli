@@ -15,8 +15,12 @@ type projectWeekInfo struct {
 	Schedule          *db.ProjectSchedule
 	Workdays          []time.Weekday
 	Worked            time.Duration
+	OvertimeUsed      time.Duration
+	Accounted         time.Duration
 	Left              time.Duration
 	TodayWorked       time.Duration
+	TodayOvertimeUsed time.Duration
+	TodayAccounted    time.Duration
 	TodayTarget       time.Duration
 	TodayLeft         time.Duration
 	TodayOvertime     time.Duration
@@ -67,9 +71,17 @@ func weekCmd() *cobra.Command {
 				return err
 			}
 
-			printBlock(
+			lines := []string{
 				badgeLine("project", project.Name),
 				line("week", formatDuration(info.Worked)+" / "+formatDuration(info.Schedule.WeeklyTarget)),
+			}
+			if info.OvertimeUsed > 0 {
+				lines = append(lines,
+					line("overtime", formatDuration(info.OvertimeUsed)),
+					line("accounted", formatDuration(info.Accounted)+" / "+formatDuration(info.Schedule.WeeklyTarget)),
+				)
+			}
+			lines = append(lines,
 				line("left", formatDuration(info.Left)),
 				line("schedule", formatWorkdayLabels(info.Workdays)),
 				line("remaining", formatWeekdays(info.RemainingWorkdays)),
@@ -78,6 +90,7 @@ func weekCmd() *cobra.Command {
 				line("balance", formatSignedDuration(info.Balance)),
 				line("projected", formatSignedDuration(info.Projected)),
 			)
+			printBlock(lines...)
 			return nil
 		},
 	}
@@ -106,7 +119,12 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		return projectWeekInfo{}, err
 	}
 	worked := totalSessionDuration(sessions, now)
-	left := schedule.WeeklyTarget - worked
+	overtimeUsed, err := store.ProjectOvertimeUsed(ctx, project.ID, &start, &end)
+	if err != nil {
+		return projectWeekInfo{}, err
+	}
+	accounted := worked + overtimeUsed
+	left := schedule.WeeklyTarget - accounted
 	if left < 0 {
 		left = 0
 	}
@@ -116,12 +134,19 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		return projectWeekInfo{}, err
 	}
 	todayWorked := totalSessionDuration(todayProjectSessions(sessions, selected), now)
-	todayTarget := todayTarget(schedule.WeeklyTarget, sessions, selected, remainingWorkdays, now)
-	todayLeft := todayTarget - todayWorked
+	todayStart := dayStart(selected)
+	todayEnd := todayStart.AddDate(0, 0, 1)
+	todayOvertimeUsed, err := store.ProjectOvertimeUsed(ctx, project.ID, &todayStart, &todayEnd)
+	if err != nil {
+		return projectWeekInfo{}, err
+	}
+	todayAccounted := todayWorked + todayOvertimeUsed
+	todayTarget := todayTarget(schedule.WeeklyTarget, selected, workdays)
+	todayLeft := todayTarget - todayAccounted
 	if todayLeft < 0 {
 		todayLeft = 0
 	}
-	todayOvertime := todayWorked - todayTarget
+	todayOvertime := todayAccounted - todayTarget
 	if todayOvertime < 0 {
 		todayOvertime = 0
 	}
@@ -131,14 +156,18 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		Schedule:          schedule,
 		Workdays:          workdays,
 		Worked:            worked,
+		OvertimeUsed:      overtimeUsed,
+		Accounted:         accounted,
 		Left:              left,
 		TodayWorked:       todayWorked,
+		TodayOvertimeUsed: todayOvertimeUsed,
+		TodayAccounted:    todayAccounted,
 		TodayTarget:       todayTarget,
 		TodayLeft:         todayLeft,
 		TodayOvertime:     todayOvertime,
 		RemainingWorkdays: remainingWorkdays,
 		Balance:           balance,
-		Projected:         balance + worked - schedule.WeeklyTarget,
+		Projected:         balance + accounted - schedule.WeeklyTarget,
 	}, nil
 }
 
@@ -183,28 +212,16 @@ func remainingWeekWorkdays(selected, weekEnd time.Time, workdays []time.Weekday)
 	return remaining
 }
 
-func todayTarget(weeklyTarget time.Duration, sessions []db.Session, selected time.Time, remainingWorkdays []time.Time, now time.Time) time.Duration {
-	for _, day := range remainingWorkdays {
-		if dayStart(day).Equal(dayStart(selected)) {
-			leftAtStartOfDay := weeklyTarget - totalSessionDuration(sessionsBeforeDay(sessions, selected), now)
-			if leftAtStartOfDay < 0 {
-				return 0
-			}
-			return perDayTarget(leftAtStartOfDay, remainingWorkdays)
+func todayTarget(weeklyTarget time.Duration, selected time.Time, workdays []time.Weekday) time.Duration {
+	if len(workdays) == 0 {
+		return 0
+	}
+	for _, day := range workdays {
+		if day == selected.Weekday() {
+			return weeklyTarget / time.Duration(len(workdays))
 		}
 	}
 	return 0
-}
-
-func sessionsBeforeDay(sessions []db.Session, selected time.Time) []db.Session {
-	start := dayStart(selected)
-	var before []db.Session
-	for _, session := range sessions {
-		if session.StartedAt.Before(start) {
-			before = append(before, session)
-		}
-	}
-	return before
 }
 
 func perDayTarget(left time.Duration, remainingWorkdays []time.Time) time.Duration {
@@ -237,6 +254,12 @@ func statusProjectWeekLines(info projectWeekInfo, now time.Time) []string {
 		line("", info.Project.Name),
 		line("week", formatDuration(info.Worked)+" / "+formatDuration(info.Schedule.WeeklyTarget)),
 		line("today", formatDuration(info.TodayWorked)+" / "+formatDuration(info.TodayTarget)),
+	}
+	if info.TodayOvertimeUsed > 0 {
+		lines = append(lines,
+			line("overtime", formatDuration(info.TodayOvertimeUsed)),
+			line("accounted", formatDuration(info.TodayAccounted)+" / "+formatDuration(info.TodayTarget)),
+		)
 	}
 	if info.TodayLeft > 0 {
 		lines = append(lines,

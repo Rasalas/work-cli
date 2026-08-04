@@ -78,8 +78,10 @@ func projectCmd() *cobra.Command {
 
 func projectSetCmd() *cobra.Command {
 	var opts struct {
-		weekly   string
-		workdays string
+		weekly      string
+		workdays    string
+		reportStart string
+		reportEnd   string
 	}
 	cmd := &cobra.Command{
 		Use:   "set <name>",
@@ -97,34 +99,96 @@ func projectSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if opts.weekly == "" {
-				return fmt.Errorf("--weekly is required")
+			setSchedule := opts.weekly != "" || opts.workdays != ""
+			setExport := opts.reportStart != "" || opts.reportEnd != ""
+			if !setSchedule && !setExport {
+				return fmt.Errorf("nothing to set; use --weekly with --workdays, or --report-start with --report-end")
 			}
-			if opts.workdays == "" {
-				return fmt.Errorf("--workdays is required")
+			if setSchedule && (opts.weekly == "" || opts.workdays == "") {
+				return fmt.Errorf("use --weekly and --workdays together")
 			}
-			weeklyTarget, err := timeparse.ParseWorkDuration(opts.weekly)
+			if setExport && (opts.reportStart == "" || opts.reportEnd == "") {
+				return fmt.Errorf("use --report-start and --report-end together")
+			}
+
+			var weeklyTarget time.Duration
+			var workdays []time.Weekday
+			if setSchedule {
+				weeklyTarget, err = timeparse.ParseWorkDuration(opts.weekly)
+				if err != nil {
+					return err
+				}
+				workdays, err = parseWorkdays(opts.workdays)
+				if err != nil {
+					return err
+				}
+			}
+			var reportStart, reportEnd string
+			if setExport {
+				reportStart, reportEnd, err = parseReportWindow(opts.reportStart, opts.reportEnd)
+				if err != nil {
+					return err
+				}
+			}
+
+			if setSchedule {
+				if err := store.SetProjectSchedule(ctx, project.ID, weeklyTarget, formatWorkdayKeys(workdays)); err != nil {
+					return err
+				}
+			}
+			if setExport {
+				if err := store.SetProjectExportSettings(ctx, project.ID, reportStart, reportEnd); err != nil {
+					return err
+				}
+			}
+
+			lines := []string{badgeLine("project", project.Name)}
+			schedule, err := store.ProjectSchedule(ctx, project.ID)
 			if err != nil {
 				return err
 			}
-			workdays, err := parseWorkdays(opts.workdays)
+			if schedule != nil {
+				workdays, err := parseWorkdays(schedule.Workdays)
+				if err != nil {
+					return err
+				}
+				lines = append(lines,
+					line("weekly", formatDuration(schedule.WeeklyTarget)+"/week"),
+					line("workdays", formatWorkdayLabels(workdays)),
+				)
+			}
+			exportSettings, err := store.ProjectExportSettings(ctx, project.ID)
 			if err != nil {
 				return err
 			}
-			if err := store.SetProjectSchedule(ctx, project.ID, weeklyTarget, formatWorkdayKeys(workdays)); err != nil {
-				return err
+			if exportSettings != nil {
+				lines = append(lines, line("reporting", exportSettings.ReportStart+" - "+exportSettings.ReportEnd))
 			}
-			printBlock(
-				badgeLine("project", project.Name),
-				line("weekly", formatDuration(weeklyTarget)+"/week"),
-				line("workdays", formatWorkdayLabels(workdays)),
-			)
+			printBlock(lines...)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&opts.weekly, "weekly", "", "weekly target duration")
 	cmd.Flags().StringVar(&opts.workdays, "workdays", "", "comma-separated workdays")
+	cmd.Flags().StringVar(&opts.reportStart, "report-start", "", "employer reporting start time")
+	cmd.Flags().StringVar(&opts.reportEnd, "report-end", "", "employer reporting end time")
 	return cmd
+}
+
+func parseReportWindow(startInput, endInput string) (string, string, error) {
+	base := time.Date(2000, 1, 1, 0, 0, 0, 0, time.Local)
+	start, err := timeparse.ParseStartTime(startInput, base)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid report start: %w", err)
+	}
+	end, err := timeparse.ParseStartTime(endInput, base)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid report end: %w", err)
+	}
+	if !end.After(start) {
+		return "", "", fmt.Errorf("report end must be after report start")
+	}
+	return start.Format("15:04"), end.Format("15:04"), nil
 }
 
 func projectBalanceCmd() *cobra.Command {

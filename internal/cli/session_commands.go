@@ -181,7 +181,10 @@ func parseNoteTime(input string, session db.Session, fallback time.Time) (time.T
 }
 
 func endCmd() *cobra.Command {
-	var opts options
+	var opts struct {
+		at          string
+		useOvertime string
+	}
 	cmd := &cobra.Command{
 		Use:   "end [time] [note]",
 		Short: "End the running work session",
@@ -197,22 +200,112 @@ func endCmd() *cobra.Command {
 			}
 			defer store.Close()
 
-			session, err := store.EndRunningSession(context.Background(), endedAt, note)
+			ctx := context.Background()
+			var overtime time.Duration
+			var workedToday time.Duration
+			var target time.Duration
+			if opts.useOvertime != "" {
+				running, err := store.RunningSession(ctx)
+				if err != nil {
+					return err
+				}
+				if running == nil {
+					return fmt.Errorf("no session is running; use `work start`")
+				}
+				overtime, workedToday, target, err = overtimeForEnd(ctx, store, *running, endedAt, opts.useOvertime)
+				if err != nil {
+					return err
+				}
+			}
+
+			var session db.Session
+			if overtime > 0 {
+				session, err = store.EndRunningSessionWithOvertime(ctx, endedAt, note, overtime)
+			} else {
+				session, err = store.EndRunningSession(ctx, endedAt, note)
+			}
 			if errors.Is(err, db.ErrNoRunningSession) {
 				return fmt.Errorf("no session is running; use `work start`")
 			}
 			if err != nil {
 				return err
 			}
-			printBlock(
+			lines := []string{
 				badgeLine("ended", formatDateTime(session.EndedAt.Time)),
 				line("", formatDuration(session.EndedAt.Time.Sub(session.StartedAt))),
-			)
+			}
+			if opts.useOvertime != "" {
+				accounted := workedToday + overtime
+				lines = append(lines,
+					line("worked", formatDuration(workedToday)),
+					line("overtime", formatDuration(overtime)),
+					line("accounted", formatDuration(accounted)+" / "+formatDuration(target)),
+				)
+				if session.ProjectID.Valid {
+					balance, err := store.ProjectBalanceAt(ctx, session.ProjectID.Int64, endedAt)
+					if err != nil {
+						return err
+					}
+					lines = append(lines, line("balance", formatSignedDuration(balance)))
+				}
+			}
+			printBlock(lines...)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&opts.at, "at", "", "end time")
+	cmd.Flags().StringVar(&opts.useOvertime, "use-overtime", "", "use overtime up to today's target, or an explicit duration")
+	cmd.Flags().Lookup("use-overtime").NoOptDefVal = "auto"
 	return cmd
+}
+
+func overtimeForEnd(ctx context.Context, store *db.Store, running db.Session, endedAt time.Time, input string) (time.Duration, time.Duration, time.Duration, error) {
+	if !running.ProjectID.Valid || !running.ProjectName.Valid {
+		return 0, 0, 0, fmt.Errorf("--use-overtime requires a project on the running session")
+	}
+	schedule, err := store.ProjectSchedule(ctx, running.ProjectID.Int64)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if schedule == nil {
+		return 0, 0, 0, fmt.Errorf("project %q has no weekly target; configure it with `work project set`", running.ProjectName.String)
+	}
+	workdays, err := parseWorkdays(schedule.Workdays)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	target := todayTarget(schedule.WeeklyTarget, endedAt, workdays)
+	if target == 0 {
+		return 0, 0, 0, fmt.Errorf("project %q has no target on %s", running.ProjectName.String, workdayLabel(endedAt.Weekday()))
+	}
+
+	start := dayStart(endedAt)
+	end := start.AddDate(0, 0, 1)
+	sessions, err := store.LogSessions(ctx, &start, &end, running.ProjectName.String)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	worked := totalSessionDuration(sessions, endedAt)
+	alreadyUsed, err := store.ProjectOvertimeUsed(ctx, running.ProjectID.Int64, &start, &end)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	remaining := target - worked - alreadyUsed
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	if input == "auto" {
+		return remaining, worked, target, nil
+	}
+	overtime, err := timeparse.ParseWorkDuration(input)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid overtime duration: %w", err)
+	}
+	if overtime > remaining {
+		return 0, 0, 0, fmt.Errorf("overtime duration %s exceeds today's remaining %s", formatDuration(overtime), formatDuration(remaining))
+	}
+	return overtime, worked, target, nil
 }
 
 func parseEndArgs(at string, args []string, base time.Time) (time.Time, string, error) {

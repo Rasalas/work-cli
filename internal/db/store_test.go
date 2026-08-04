@@ -164,6 +164,49 @@ func TestLastEndedSessionUsesLatestEndTime(t *testing.T) {
 	}
 }
 
+func TestOvertimeUsageIsNotDeductedTwiceWhenWeekCompletes(t *testing.T) {
+	store := newStore(t)
+	ctx := context.Background()
+	project, err := store.AddProject(ctx, "someproject")
+	if err != nil {
+		t.Fatalf("AddProject() error = %v", err)
+	}
+	if err := store.SetProjectSchedule(ctx, project.ID, 20*time.Hour, "mon,tue,thu,fri"); err != nil {
+		t.Fatalf("SetProjectSchedule() error = %v", err)
+	}
+	monday := time.Date(2026, 6, 8, 8, 0, 0, 0, time.Local)
+	if err := store.SetProjectBalance(ctx, project.ID, monday, 80*time.Hour); err != nil {
+		t.Fatalf("SetProjectBalance() error = %v", err)
+	}
+
+	if _, err := store.StartSession(ctx, monday, &project.ID); err != nil {
+		t.Fatalf("StartSession() error = %v", err)
+	}
+	if _, err := store.EndRunningSessionWithOvertime(ctx, monday.Add(3*time.Hour), "", 2*time.Hour); err != nil {
+		t.Fatalf("EndRunningSessionWithOvertime() error = %v", err)
+	}
+	for _, day := range []time.Time{
+		monday.AddDate(0, 0, 1),
+		monday.AddDate(0, 0, 3),
+		monday.AddDate(0, 0, 4),
+	} {
+		if _, err := store.StartSession(ctx, day, &project.ID); err != nil {
+			t.Fatalf("StartSession() error = %v", err)
+		}
+		if _, err := store.EndRunningSession(ctx, day.Add(5*time.Hour), ""); err != nil {
+			t.Fatalf("EndRunningSession() error = %v", err)
+		}
+	}
+
+	balance, err := store.ProjectBalanceAt(ctx, project.ID, monday.AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("ProjectBalanceAt() error = %v", err)
+	}
+	if got, want := balance, 78*time.Hour; got != want {
+		t.Fatalf("ProjectBalanceAt() = %s, want %s", got, want)
+	}
+}
+
 func newStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := Open(filepath.Join(t.TempDir(), "work.sqlite"))

@@ -30,6 +30,13 @@ type ProjectSchedule struct {
 	LastUpdatedAt time.Time
 }
 
+type ProjectExportSettings struct {
+	ProjectID   int64
+	ReportStart string
+	ReportEnd   string
+	UpdatedAt   time.Time
+}
+
 type Session struct {
 	ID          int64
 	ProjectID   sql.NullInt64
@@ -45,6 +52,15 @@ type Note struct {
 	SessionID int64
 	Kind      string
 	Body      string
+	CreatedAt time.Time
+}
+
+type OvertimeUsage struct {
+	ID        int64
+	ProjectID int64
+	SessionID int64
+	UsedOn    time.Time
+	Duration  time.Duration
 	CreatedAt time.Time
 }
 
@@ -144,10 +160,27 @@ CREATE TABLE IF NOT EXISTS project_balance_adjustments (
 	created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_export_settings (
+	project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+	report_start TEXT NOT NULL,
+	report_end TEXT NOT NULL,
+	updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS project_overtime_usages (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	session_id INTEGER NOT NULL UNIQUE REFERENCES sessions(id) ON DELETE CASCADE,
+	used_on TEXT NOT NULL,
+	minutes INTEGER NOT NULL CHECK (minutes > 0),
+	created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_open ON sessions(ended_at) WHERE ended_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_notes_session_id ON notes(session_id);
 CREATE INDEX IF NOT EXISTS idx_project_balance_adjustments_project_id ON project_balance_adjustments(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_overtime_usages_project_date ON project_overtime_usages(project_id, used_on);
 `)
 	return err
 }
@@ -239,6 +272,40 @@ WHERE project_id = ?
 	return &schedule, nil
 }
 
+func (s *Store) SetProjectExportSettings(ctx context.Context, projectID int64, reportStart, reportEnd string) error {
+	now := time.Now()
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO project_export_settings (project_id, report_start, report_end, updated_at)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(project_id) DO UPDATE SET
+	report_start = excluded.report_start,
+	report_end = excluded.report_end,
+	updated_at = excluded.updated_at
+`, projectID, reportStart, reportEnd, formatTime(now))
+	return err
+}
+
+func (s *Store) ProjectExportSettings(ctx context.Context, projectID int64) (*ProjectExportSettings, error) {
+	var settings ProjectExportSettings
+	err := s.db.QueryRowContext(ctx, `
+SELECT project_id, report_start, report_end, updated_at
+FROM project_export_settings
+WHERE project_id = ?
+`, projectID).Scan(
+		&settings.ProjectID,
+		&settings.ReportStart,
+		&settings.ReportEnd,
+		parseScanner(&settings.UpdatedAt),
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &settings, nil
+}
+
 func (s *Store) SetProjectBalance(ctx context.Context, projectID int64, date time.Time, balance time.Duration) error {
 	current, _, err := s.rawProjectBalance(ctx, projectID)
 	if err != nil {
@@ -268,11 +335,10 @@ func (s *Store) ProjectBalanceAt(ctx context.Context, projectID int64, at time.T
 	if err != nil {
 		return 0, err
 	}
-	if schedule == nil {
-		return balance, nil
+	start := balanceWeekStart(at)
+	if schedule != nil {
+		start = balanceWeekStart(schedule.LastUpdatedAt)
 	}
-
-	start := balanceWeekStart(schedule.LastUpdatedAt)
 	if latestAdjustmentDate.Valid {
 		parsed, err := time.ParseInLocation("2006-01-02", latestAdjustmentDate.String, time.Local)
 		if err != nil {
@@ -280,16 +346,23 @@ func (s *Store) ProjectBalanceAt(ctx context.Context, projectID int64, at time.T
 		}
 		start = balanceWeekStart(parsed)
 	}
+	used, err := s.ProjectOvertimeUsed(ctx, projectID, &start, endOfLocalDay(at))
+	if err != nil {
+		return 0, err
+	}
+	if schedule == nil {
+		return balance - used, nil
+	}
 	completedBefore := balanceWeekStart(at)
 	if !completedBefore.After(start) {
-		return balance, nil
+		return balance - used, nil
 	}
 
 	delta, err := s.completedWeeklyBalanceDelta(ctx, projectID, start, completedBefore, schedule.WeeklyTarget)
 	if err != nil {
 		return 0, err
 	}
-	return balance + delta, nil
+	return balance - used + delta, nil
 }
 
 func (s *Store) rawProjectBalance(ctx context.Context, projectID int64) (time.Duration, sql.NullString, error) {
@@ -334,10 +407,19 @@ WHERE project_id = ?
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}
+	usages, err := s.OvertimeUsages(ctx, projectID, &start, &completedBefore)
+	if err != nil {
+		return 0, err
+	}
+	usedByWeek := make(map[time.Time]time.Duration)
+	for _, usage := range usages {
+		week := balanceWeekStart(usage.UsedOn)
+		usedByWeek[week] += usage.Duration
+	}
 
 	var delta time.Duration
 	for week := start; week.Before(completedBefore); week = week.AddDate(0, 0, 7) {
-		delta += workedByWeek[week] - weeklyTarget
+		delta += workedByWeek[week] + usedByWeek[week] - weeklyTarget
 	}
 	return delta, nil
 }
@@ -375,6 +457,17 @@ VALUES (?, ?, ?, ?)
 }
 
 func (s *Store) EndRunningSession(ctx context.Context, endedAt time.Time, note string) (Session, error) {
+	return s.endRunningSession(ctx, endedAt, note, 0)
+}
+
+func (s *Store) EndRunningSessionWithOvertime(ctx context.Context, endedAt time.Time, note string, overtime time.Duration) (Session, error) {
+	if durationMinutes(overtime) <= 0 {
+		return Session{}, fmt.Errorf("overtime usage must be positive")
+	}
+	return s.endRunningSession(ctx, endedAt, note, overtime)
+}
+
+func (s *Store) endRunningSession(ctx context.Context, endedAt time.Time, note string, overtime time.Duration) (Session, error) {
 	running, err := s.RunningSession(ctx)
 	if err != nil {
 		return Session{}, err
@@ -384,6 +477,9 @@ func (s *Store) EndRunningSession(ctx context.Context, endedAt time.Time, note s
 	}
 	if endedAt.Before(running.StartedAt) {
 		return Session{}, fmt.Errorf("end time cannot be before start time")
+	}
+	if overtime > 0 && !running.ProjectID.Valid {
+		return Session{}, fmt.Errorf("overtime usage requires a project")
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -407,10 +503,78 @@ VALUES (?, 'done', ?, ?)
 			return Session{}, err
 		}
 	}
+	if overtime > 0 {
+		_, err = tx.ExecContext(ctx, `
+INSERT INTO project_overtime_usages (project_id, session_id, used_on, minutes, created_at)
+VALUES (?, ?, ?, ?, ?)
+`, running.ProjectID.Int64, running.ID, endedAt.Local().Format("2006-01-02"), durationMinutes(overtime), formatTime(time.Now()))
+		if err != nil {
+			return Session{}, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return Session{}, err
 	}
 	return s.SessionByID(ctx, running.ID)
+}
+
+func (s *Store) OvertimeUsages(ctx context.Context, projectID int64, from, to *time.Time) ([]OvertimeUsage, error) {
+	where := "WHERE project_id = ?"
+	args := []any{projectID}
+	if from != nil {
+		where += " AND used_on >= ?"
+		args = append(args, from.Local().Format("2006-01-02"))
+	}
+	if to != nil {
+		where += " AND used_on < ?"
+		args = append(args, to.Local().Format("2006-01-02"))
+	}
+	rows, err := s.db.QueryContext(ctx, `
+SELECT id, project_id, session_id, used_on, minutes, created_at
+FROM project_overtime_usages
+`+where+`
+ORDER BY used_on ASC, id ASC
+`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var usages []OvertimeUsage
+	for rows.Next() {
+		var usage OvertimeUsage
+		var usedOn string
+		var minutes int64
+		if err := rows.Scan(
+			&usage.ID,
+			&usage.ProjectID,
+			&usage.SessionID,
+			&usedOn,
+			&minutes,
+			parseScanner(&usage.CreatedAt),
+		); err != nil {
+			return nil, err
+		}
+		usage.UsedOn, err = time.ParseInLocation("2006-01-02", usedOn, time.Local)
+		if err != nil {
+			return nil, err
+		}
+		usage.Duration = time.Duration(minutes) * time.Minute
+		usages = append(usages, usage)
+	}
+	return usages, rows.Err()
+}
+
+func (s *Store) ProjectOvertimeUsed(ctx context.Context, projectID int64, from, to *time.Time) (time.Duration, error) {
+	usages, err := s.OvertimeUsages(ctx, projectID, from, to)
+	if err != nil {
+		return 0, err
+	}
+	var total time.Duration
+	for _, usage := range usages {
+		total += usage.Duration
+	}
+	return total, nil
 }
 
 func (s *Store) AddNote(ctx context.Context, kind, body string, createdAt time.Time) (Note, error) {
@@ -698,6 +862,13 @@ func balanceWeekStart(t time.Time) time.Time {
 	start := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	offset := (int(start.Weekday()) + 6) % 7
 	return start.AddDate(0, 0, -offset)
+}
+
+func endOfLocalDay(t time.Time) *time.Time {
+	local := t.Local()
+	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+	end := start.AddDate(0, 0, 1)
+	return &end
 }
 
 type timeScanner struct {
