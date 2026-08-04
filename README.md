@@ -51,6 +51,7 @@ work note ls 1
 work note edit 3 --at 1330
 work status
 work end 1402
+work end --at-target
 work end 1402 --use-overtime
 work end 1402 --use-overtime=1h
 work log --today
@@ -118,6 +119,22 @@ work end 1400 --use-overtime=1h
 The session keeps its actual end time. Overtime use is stored separately,
 reduces the balance immediately, and counts toward the weekly target without
 being deducted a second time when the week completes.
+
+If a forgotten pause leaves a session running beyond today's planned target,
+end it exactly when the target was reached:
+
+```bash
+work end --at-target
+```
+
+Earlier sessions and overtime already used on the same day are included. The
+command refuses to end the session in the future when the target has not been
+reached yet. `--at-target` cannot be combined with `--use-overtime`. An explicit
+reference time can be supplied for a correction:
+
+```bash
+work end 1530 --at-target
+```
 
 Show the weekly projection with:
 

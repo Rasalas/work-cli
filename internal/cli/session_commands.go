@@ -183,6 +183,7 @@ func parseNoteTime(input string, session db.Session, fallback time.Time) (time.T
 func endCmd() *cobra.Command {
 	var opts struct {
 		at          string
+		atTarget    bool
 		useOvertime string
 	}
 	cmd := &cobra.Command{
@@ -190,6 +191,9 @@ func endCmd() *cobra.Command {
 		Short: "End the running work session",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.atTarget && cmd.Flags().Changed("use-overtime") {
+				return fmt.Errorf("use either --at-target or --use-overtime")
+			}
 			endedAt, note, err := parseEndArgs(opts.at, args, time.Now())
 			if err != nil {
 				return err
@@ -204,7 +208,8 @@ func endCmd() *cobra.Command {
 			var overtime time.Duration
 			var workedToday time.Duration
 			var target time.Duration
-			if opts.useOvertime != "" {
+			var targetInfo *targetEndInfo
+			if opts.atTarget || opts.useOvertime != "" {
 				running, err := store.RunningSession(ctx)
 				if err != nil {
 					return err
@@ -212,9 +217,18 @@ func endCmd() *cobra.Command {
 				if running == nil {
 					return fmt.Errorf("no session is running; use `work start`")
 				}
-				overtime, workedToday, target, err = overtimeForEnd(ctx, store, *running, endedAt, opts.useOvertime)
-				if err != nil {
-					return err
+				if opts.atTarget {
+					info, err := targetEndForSession(ctx, store, *running, endedAt)
+					if err != nil {
+						return err
+					}
+					targetInfo = &info
+					endedAt = info.EndedAt
+				} else {
+					overtime, workedToday, target, err = overtimeForEnd(ctx, store, *running, endedAt, opts.useOvertime)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -249,14 +263,97 @@ func endCmd() *cobra.Command {
 					lines = append(lines, line("balance", formatSignedDuration(balance)))
 				}
 			}
+			if targetInfo != nil {
+				lines = append(lines, line("worked", formatDuration(targetInfo.Worked)))
+				if targetInfo.OvertimeUsed > 0 {
+					lines = append(lines, line("overtime", formatDuration(targetInfo.OvertimeUsed)))
+				}
+				lines = append(lines,
+					line("accounted", formatDuration(targetInfo.Accounted)+" / "+formatDuration(targetInfo.Target)),
+					line("ignored", formatDuration(targetInfo.Ignored)),
+				)
+			}
 			printBlock(lines...)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&opts.at, "at", "", "end time")
+	cmd.Flags().BoolVar(&opts.atTarget, "at-target", false, "end when today's planned target was reached")
 	cmd.Flags().StringVar(&opts.useOvertime, "use-overtime", "", "use overtime up to today's target, or an explicit duration")
 	cmd.Flags().Lookup("use-overtime").NoOptDefVal = "auto"
 	return cmd
+}
+
+type targetEndInfo struct {
+	EndedAt      time.Time
+	Worked       time.Duration
+	OvertimeUsed time.Duration
+	Accounted    time.Duration
+	Target       time.Duration
+	Ignored      time.Duration
+}
+
+func targetEndForSession(ctx context.Context, store *db.Store, running db.Session, referenceEnd time.Time) (targetEndInfo, error) {
+	if !running.ProjectID.Valid || !running.ProjectName.Valid {
+		return targetEndInfo{}, fmt.Errorf("--at-target requires a project on the running session")
+	}
+	if referenceEnd.Before(running.StartedAt) {
+		return targetEndInfo{}, fmt.Errorf("end time cannot be before start time")
+	}
+	if !dayStart(referenceEnd).Equal(dayStart(running.StartedAt)) {
+		return targetEndInfo{}, fmt.Errorf("--at-target requires the running session to start and end on the same day")
+	}
+	schedule, err := store.ProjectSchedule(ctx, running.ProjectID.Int64)
+	if err != nil {
+		return targetEndInfo{}, err
+	}
+	if schedule == nil {
+		return targetEndInfo{}, fmt.Errorf("project %q has no weekly target; configure it with `work project set`", running.ProjectName.String)
+	}
+	workdays, err := parseWorkdays(schedule.Workdays)
+	if err != nil {
+		return targetEndInfo{}, err
+	}
+	target := todayTarget(schedule.WeeklyTarget, running.StartedAt, workdays)
+	if target == 0 {
+		return targetEndInfo{}, fmt.Errorf("project %q has no target on %s", running.ProjectName.String, workdayLabel(running.StartedAt.Weekday()))
+	}
+
+	start := dayStart(running.StartedAt)
+	end := start.AddDate(0, 0, 1)
+	sessions, err := store.LogSessions(ctx, &start, &end, running.ProjectName.String)
+	if err != nil {
+		return targetEndInfo{}, err
+	}
+	var workedBefore time.Duration
+	for _, session := range sessions {
+		if session.ID == running.ID || !session.EndedAt.Valid {
+			continue
+		}
+		if session.EndedAt.Time.After(session.StartedAt) {
+			workedBefore += session.EndedAt.Time.Sub(session.StartedAt)
+		}
+	}
+	alreadyUsed, err := store.ProjectOvertimeUsed(ctx, running.ProjectID.Int64, &start, &end)
+	if err != nil {
+		return targetEndInfo{}, err
+	}
+	remaining := target - workedBefore - alreadyUsed
+	if remaining <= 0 {
+		return targetEndInfo{}, fmt.Errorf("today's target was already reached before the running session")
+	}
+	targetEnd := running.StartedAt.Add(remaining)
+	if targetEnd.After(referenceEnd) {
+		return targetEndInfo{}, fmt.Errorf("today's target will be reached at %s; end normally or try --at-target later", formatClock(targetEnd))
+	}
+	return targetEndInfo{
+		EndedAt:      targetEnd,
+		Worked:       workedBefore + remaining,
+		OvertimeUsed: alreadyUsed,
+		Accounted:    target,
+		Target:       target,
+		Ignored:      referenceEnd.Sub(targetEnd),
+	}, nil
 }
 
 func overtimeForEnd(ctx context.Context, store *db.Store, running db.Session, endedAt time.Time, input string) (time.Duration, time.Duration, time.Duration, error) {
