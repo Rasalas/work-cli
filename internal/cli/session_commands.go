@@ -192,7 +192,7 @@ func endCmd() *cobra.Command {
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.atTarget && cmd.Flags().Changed("use-overtime") {
-				return fmt.Errorf("use either --at-target or --use-overtime")
+				return fmt.Errorf("use --at-target to correct an overrun, or --use-overtime to end at the specified time (or now) and fill today's remaining target")
 			}
 			endedAt, note, err := parseEndArgs(opts.at, args, time.Now())
 			if err != nil {
@@ -278,8 +278,8 @@ func endCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.at, "at", "", "end time")
-	cmd.Flags().BoolVar(&opts.atTarget, "at-target", false, "end when today's planned target was reached")
-	cmd.Flags().StringVar(&opts.useOvertime, "use-overtime", "", "use overtime up to today's target, or an explicit duration")
+	cmd.Flags().BoolVar(&opts.atTarget, "at-target", false, "move the end back to when today's planned target was reached")
+	cmd.Flags().StringVar(&opts.useOvertime, "use-overtime", "", "end at the specified time (or now) and fill today's remaining target with overtime, or use an explicit duration")
 	cmd.Flags().Lookup("use-overtime").NoOptDefVal = "auto"
 	return cmd
 }
@@ -351,7 +351,7 @@ func targetEndForSession(ctx context.Context, store *db.Store, running db.Sessio
 	}
 	targetEnd := running.StartedAt.Add(remaining)
 	if targetEnd.After(referenceEnd) {
-		return targetEndInfo{}, fmt.Errorf("today's target will be reached at %s; end normally or try --at-target later", formatClock(targetEnd))
+		return targetEndInfo{}, fmt.Errorf("today's target will be reached at %s; use --use-overtime to end at the specified time (or now) and cover the remainder, or try --at-target later", formatClock(targetEnd))
 	}
 	return targetEndInfo{
 		EndedAt:      targetEnd,

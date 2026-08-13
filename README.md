@@ -52,6 +52,7 @@ work note edit 3 --at 1330
 work status
 work end 1402
 work end --at-target
+work end --use-overtime
 work end 1402 --use-overtime
 work end 1402 --use-overtime=1h
 work log --today
@@ -106,7 +107,13 @@ The optional `--date YYYY-MM-DD` flag records the balance adjustment date:
 work project balance someproject --set 80h --date 2026-06-03
 ```
 
-End a session early and use enough overtime to reach today's planned target:
+End a session now and use enough overtime to reach today's planned target:
+
+```bash
+work end --use-overtime
+```
+
+To use a fixed end time instead:
 
 ```bash
 work end 1400 --use-overtime
@@ -131,8 +138,10 @@ work end --at-target
 
 Earlier sessions and overtime already used on the same day are included. The
 command refuses to end the session in the future when the target has not been
-reached yet. `--at-target` cannot be combined with `--use-overtime`. An explicit
-reference time can be supplied for a correction:
+reached yet. Use `--use-overtime` instead to end now and cover the remainder.
+Because that keeps the actual end time while `--at-target` moves it backward,
+the flags cannot be combined. An explicit reference time can be supplied for a
+correction:
 
 ```bash
 work end 1530 --at-target

@@ -93,7 +93,7 @@ func TestEndAtTargetKeepsSessionRunningUntilTargetIsReached(t *testing.T) {
 	if err == nil {
 		t.Fatal("work end --at-target error = nil, want target-not-reached error")
 	}
-	if got := err.Error(); got != "today's target will be reached at 13:00; end normally or try --at-target later" {
+	if got := err.Error(); got != "today's target will be reached at 13:00; use --use-overtime to end at the specified time (or now) and cover the remainder, or try --at-target later" {
 		t.Fatalf("error = %q", got)
 	}
 
@@ -117,7 +117,7 @@ func TestEndAtTargetRejectsUseOvertimeCombination(t *testing.T) {
 			useTempWorkDB(t)
 
 			err := runWorkCommandError("end", "--at-target", overtimeFlag)
-			if err == nil || err.Error() != "use either --at-target or --use-overtime" {
+			if err == nil || err.Error() != "use --at-target to correct an overrun, or --use-overtime to end at the specified time (or now) and fill today's remaining target" {
 				t.Fatalf("error = %v, want mutually exclusive flags error", err)
 			}
 		})
