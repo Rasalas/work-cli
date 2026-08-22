@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,8 @@ import (
 )
 
 type Store struct {
-	db *sql.DB
+	db   *sql.DB
+	path string
 }
 
 type Project struct {
@@ -109,12 +111,17 @@ func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
-	conn, err := sql.Open("sqlite", path)
+	dsn := (&url.URL{
+		Scheme:   "file",
+		Path:     path,
+		RawQuery: "_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)",
+	}).String()
+	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 	conn.SetMaxOpenConns(1)
-	store := &Store{db: conn}
+	store := &Store{db: conn, path: path}
 	if err := store.migrate(context.Background()); err != nil {
 		_ = conn.Close()
 		return nil, err
@@ -126,10 +133,41 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-func (s *Store) migrate(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, `
-PRAGMA foreign_keys = ON;
+// Backup writes a consistent snapshot of the database to target using
+// SQLite's VACUUM INTO. The target must not exist yet.
+func (s *Store) Backup(ctx context.Context, target string) error {
+	if _, err := os.Stat(target); err == nil {
+		return fmt.Errorf("backup target already exists: %s", target)
+	}
+	if _, err := s.db.ExecContext(ctx, `VACUUM INTO ?`, target); err != nil {
+		return fmt.Errorf("backup to %s: %w", target, err)
+	}
+	return nil
+}
 
+var ErrNoMigrationBackup = errors.New("database file does not exist yet; nothing to back up")
+
+// backupBeforeMigration copies the current database contents to a timestamped
+// snapshot next to the database file. It is called before schema migrations
+// are applied so that a failed migration never loses data.
+func (s *Store) backupBeforeMigration(ctx context.Context, at time.Time) (string, error) {
+	target := fmt.Sprintf("%s.pre-migration-%s.bak", s.path, at.Format("20060102-150405"))
+	if _, err := os.Stat(target); err == nil {
+		return "", fmt.Errorf("backup target already exists: %s", target)
+	}
+	if _, err := s.db.ExecContext(ctx, `VACUUM INTO ?`, target); err != nil {
+		return "", fmt.Errorf("pre-migration backup to %s: %w", target, err)
+	}
+	return target, nil
+}
+
+// migrations holds the ordered schema migrations. Entry i upgrades the
+// database from version i to version i+1 (tracked via PRAGMA user_version).
+// Every statement must be idempotent enough for databases that predate
+// version tracking (user_version == 0 with an existing v1 schema).
+var migrations = []string{
+	// v1: initial schema.
+	`
 CREATE TABLE IF NOT EXISTS projects (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	name TEXT NOT NULL UNIQUE,
@@ -203,8 +241,43 @@ CREATE INDEX IF NOT EXISTS idx_notes_session_id ON notes(session_id);
 CREATE INDEX IF NOT EXISTS idx_project_balance_adjustments_project_id ON project_balance_adjustments(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_overtime_usages_project_date ON project_overtime_usages(project_id, used_on);
 CREATE INDEX IF NOT EXISTS idx_project_absences_project_dates ON project_absences(project_id, starts_on, ends_on);
-`)
-	return err
+`,
+}
+
+func (s *Store) migrate(ctx context.Context) error {
+	var version int
+	if err := s.db.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&version); err != nil {
+		return fmt.Errorf("read user_version: %w", err)
+	}
+	if version < len(migrations) {
+		if info, err := os.Stat(s.path); err == nil && info.Size() > 0 {
+			if _, err := s.backupBeforeMigration(ctx, time.Now()); err != nil {
+				return err
+			}
+		}
+	}
+	for i, stmt := range migrations {
+		v := i + 1
+		if v <= version {
+			continue
+		}
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("migration %d: %w", v, err)
+		}
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`PRAGMA user_version = %d`, v)); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("migration %d: set user_version: %w", v, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("migration %d: commit: %w", v, err)
+		}
+	}
+	return nil
 }
 
 func (s *Store) AddProject(ctx context.Context, name string) (Project, error) {
