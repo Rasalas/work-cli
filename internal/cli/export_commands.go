@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Rasalas/work-cli/internal/calendar"
 	"github.com/Rasalas/work-cli/internal/db"
 )
 
@@ -117,7 +118,7 @@ func loadExportDays(ctx context.Context, store *db.Store, project db.Project, fr
 
 	days := make(map[string]*exportDay)
 	for _, session := range sessions {
-		date := dayStart(session.StartedAt)
+		date := calendar.DayStart(session.StartedAt)
 		key := date.Format("2006-01-02")
 		day := days[key]
 		if day == nil {

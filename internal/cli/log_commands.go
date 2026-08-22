@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Rasalas/work-cli/internal/calendar"
 	"github.com/Rasalas/work-cli/internal/db"
 )
 
@@ -39,11 +40,11 @@ func logCmd() *cobra.Command {
 				return fmt.Errorf("use only one of --today, --week, --date, or --since")
 			}
 			if opts.today {
-				start := dayStart(now)
+				start := calendar.DayStart(now)
 				end := start.AddDate(0, 0, 1)
 				from, to = &start, &end
 			} else if opts.week {
-				start := weekStart(now)
+				start := calendar.WeekStart(now)
 				end := start.AddDate(0, 0, 7)
 				from, to = &start, &end
 			} else if opts.date != "" {
@@ -111,7 +112,7 @@ func parseLogDate(input string, location *time.Location) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("invalid date %q; use YYYY-MM-DD", input)
 	}
-	return dayStart(parsed), nil
+	return calendar.DayStart(parsed), nil
 }
 
 func parseLogSince(input string, now time.Time) (time.Time, error) {
@@ -186,7 +187,7 @@ type daySummaryInfo struct {
 }
 
 func todaySummary(ctx context.Context, store *db.Store, now time.Time) (daySummaryInfo, error) {
-	start := dayStart(now)
+	start := calendar.DayStart(now)
 	end := start.AddDate(0, 0, 1)
 	sessions, err := store.LogSessions(ctx, &start, &end, "")
 	if err != nil {
@@ -226,18 +227,4 @@ func chronologicalSessions(sessions []db.Session) {
 	for i, j := 0, len(sessions)-1; i < j; i, j = i+1, j-1 {
 		sessions[i], sessions[j] = sessions[j], sessions[i]
 	}
-}
-
-func dayStart(t time.Time) time.Time {
-	local := t.Local()
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
-}
-
-func weekStart(t time.Time) time.Time {
-	start := dayStart(t)
-	offset := int(start.Weekday() - time.Monday)
-	if offset < 0 {
-		offset += 7
-	}
-	return start.AddDate(0, 0, -offset)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Rasalas/work-cli/internal/calendar"
 	"github.com/Rasalas/work-cli/internal/db"
 )
 
@@ -44,7 +45,7 @@ func weekCmd() *cobra.Command {
 			if opts.project != "" && len(args) > 0 {
 				return fmt.Errorf("use either --project or positional project")
 			}
-			selected := dayStart(time.Now())
+			selected := calendar.DayStart(time.Now())
 			var err error
 			if opts.date != "" {
 				selected, err = parseLogDate(opts.date, time.Local)
@@ -117,7 +118,7 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		return projectWeekInfo{}, err
 	}
 
-	start := weekStart(selected)
+	start := calendar.WeekStart(selected)
 	end := start.AddDate(0, 0, 7)
 	absenceReduction, err := store.ProjectAbsenceTargetReduction(ctx, project.ID, start, end, schedule.WeeklyTarget, schedule.Workdays)
 	if err != nil {
@@ -153,7 +154,7 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 		return projectWeekInfo{}, err
 	}
 	todayWorked := totalSessionDuration(todayProjectSessions(sessions, selected), now)
-	todayStart := dayStart(selected)
+	todayStart := calendar.DayStart(selected)
 	todayEnd := todayStart.AddDate(0, 0, 1)
 	todayOvertimeUsed, err := store.ProjectOvertimeUsed(ctx, project.ID, &todayStart, &todayEnd)
 	if err != nil {
@@ -161,7 +162,7 @@ func loadProjectWeekInfo(ctx context.Context, store *db.Store, project db.Projec
 	}
 	todayAccounted := todayWorked + todayOvertimeUsed
 	todayTarget := todayTarget(schedule.WeeklyTarget, selected, workdays)
-	if absentDates[dayStart(selected).Format("2006-01-02")] {
+	if absentDates[calendar.DayStart(selected).Format("2006-01-02")] {
 		todayTarget = 0
 	}
 	todayLeft := todayTarget - todayAccounted
@@ -210,7 +211,7 @@ func totalSessionDuration(sessions []db.Session, now time.Time) time.Duration {
 }
 
 func todayProjectSessions(sessions []db.Session, selected time.Time) []db.Session {
-	start := dayStart(selected)
+	start := calendar.DayStart(selected)
 	end := start.AddDate(0, 0, 1)
 	var today []db.Session
 	for _, session := range sessions {
@@ -226,7 +227,7 @@ func remainingWeekWorkdays(selected, weekEnd time.Time, workdays []time.Weekday)
 	for _, day := range workdays {
 		workdaySet[day] = true
 	}
-	start := dayStart(selected)
+	start := calendar.DayStart(selected)
 	var remaining []time.Time
 	for day := start; day.Before(weekEnd); day = day.AddDate(0, 0, 1) {
 		if workdaySet[day.Weekday()] {

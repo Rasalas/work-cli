@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Rasalas/work-cli/internal/calendar"
 	_ "modernc.org/sqlite"
 )
 
@@ -430,16 +431,16 @@ func (s *Store) ProjectBalanceAt(ctx context.Context, projectID int64, at time.T
 	if err != nil {
 		return 0, err
 	}
-	start := balanceWeekStart(at)
+	start := calendar.WeekStart(at)
 	if schedule != nil {
-		start = balanceWeekStart(schedule.LastUpdatedAt)
+		start = calendar.WeekStart(schedule.LastUpdatedAt)
 	}
 	if latestAdjustmentDate.Valid {
 		parsed, err := time.ParseInLocation("2006-01-02", latestAdjustmentDate.String, time.Local)
 		if err != nil {
 			return 0, err
 		}
-		start = balanceWeekStart(parsed)
+		start = calendar.WeekStart(parsed)
 	}
 	used, err := s.ProjectOvertimeUsed(ctx, projectID, &start, endOfLocalDay(at))
 	if err != nil {
@@ -448,7 +449,7 @@ func (s *Store) ProjectBalanceAt(ctx context.Context, projectID int64, at time.T
 	if schedule == nil {
 		return balance - used, nil
 	}
-	completedBefore := balanceWeekStart(at)
+	completedBefore := calendar.WeekStart(at)
 	if !completedBefore.After(start) {
 		return balance - used, nil
 	}
@@ -495,7 +496,7 @@ WHERE project_id = ?
 			return 0, err
 		}
 		if endedAt.After(startedAt) {
-			week := balanceWeekStart(startedAt)
+			week := calendar.WeekStart(startedAt)
 			workedByWeek[week] += endedAt.Sub(startedAt)
 		}
 	}
@@ -508,7 +509,7 @@ WHERE project_id = ?
 	}
 	usedByWeek := make(map[time.Time]time.Duration)
 	for _, usage := range usages {
-		week := balanceWeekStart(usage.UsedOn)
+		week := calendar.WeekStart(usage.UsedOn)
 		usedByWeek[week] += usage.Duration
 	}
 
@@ -677,8 +678,8 @@ func (s *Store) ProjectOvertimeUsed(ctx context.Context, projectID int64, from, 
 }
 
 func (s *Store) AddProjectAbsence(ctx context.Context, projectID int64, startsOn, endsOn time.Time, kind string) (ProjectAbsence, error) {
-	startsOn = localDate(startsOn)
-	endsOn = localDate(endsOn)
+	startsOn = calendar.DayStart(startsOn)
+	endsOn = calendar.DayStart(endsOn)
 	if endsOn.Before(startsOn) {
 		return ProjectAbsence{}, fmt.Errorf("absence end cannot be before start")
 	}
@@ -728,11 +729,11 @@ func (s *Store) ProjectAbsences(ctx context.Context, projectID int64, from, to *
 	args := []any{projectID}
 	if from != nil {
 		where += " AND ends_on >= ?"
-		args = append(args, localDate(*from).Format("2006-01-02"))
+		args = append(args, calendar.DayStart(*from).Format("2006-01-02"))
 	}
 	if to != nil {
 		where += " AND starts_on < ?"
-		args = append(args, localDate(*to).Format("2006-01-02"))
+		args = append(args, calendar.DayStart(*to).Format("2006-01-02"))
 	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id, project_id, kind, starts_on, ends_on, created_at
@@ -773,7 +774,7 @@ ORDER BY starts_on ASC, id ASC
 }
 
 func (s *Store) ProjectAbsentOn(ctx context.Context, projectID int64, date time.Time) (bool, error) {
-	start := localDate(date)
+	start := calendar.DayStart(date)
 	end := start.AddDate(0, 0, 1)
 	absences, err := s.ProjectAbsences(ctx, projectID, &start, &end)
 	if err != nil {
@@ -783,8 +784,8 @@ func (s *Store) ProjectAbsentOn(ctx context.Context, projectID int64, date time.
 }
 
 func (s *Store) ProjectAbsenceTargetReduction(ctx context.Context, projectID int64, from, to time.Time, weeklyTarget time.Duration, workdays string) (time.Duration, error) {
-	from = localDate(from)
-	to = localDate(to)
+	from = calendar.DayStart(from)
+	to = calendar.DayStart(to)
 	if !to.After(from) {
 		return 0, nil
 	}
@@ -1095,24 +1096,11 @@ func durationMinutes(duration time.Duration) int64 {
 	return int64(duration.Round(time.Minute) / time.Minute)
 }
 
-func balanceWeekStart(t time.Time) time.Time {
-	local := t.Local()
-	year, month, day := local.Date()
-	start := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
-	offset := (int(start.Weekday()) + 6) % 7
-	return start.AddDate(0, 0, -offset)
-}
-
 func endOfLocalDay(t time.Time) *time.Time {
 	local := t.Local()
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
 	end := start.AddDate(0, 0, 1)
 	return &end
-}
-
-func localDate(t time.Time) time.Time {
-	local := t.Local()
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
 }
 
 func scheduledWeekdays(workdays string) map[time.Weekday]bool {
