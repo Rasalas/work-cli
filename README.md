@@ -69,7 +69,29 @@ work db path
 ```
 
 Data is stored in SQLite at `~/.local/share/work-cli/work.sqlite` by default.
-Set `WORK_DB` to use another path.
+Set `WORK_DB` to use another path (or `XDG_DATA_HOME` to relocate the data
+directory).
+
+### Backups
+
+```bash
+work db backup                # snapshot next to the database
+work db backup --dir ~/backups
+```
+
+Backups are consistent SQLite snapshots (`VACUUM INTO`). Before schema
+migrations are applied on startup, an automatic pre-migration backup is
+written next to the database.
+
+### Shell completion
+
+`work` ships cobra-based shell completion:
+
+```bash
+work completion bash   # also: zsh, fish, powershell
+# e.g. for zsh:
+work completion zsh > "${fpath[1]}/_work"
+```
 
 ## Projects
 

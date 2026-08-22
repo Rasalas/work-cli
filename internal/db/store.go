@@ -107,17 +107,17 @@ func DefaultPath() (string, error) {
 
 func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create database directory %s: %w", filepath.Dir(path), err)
 	}
 	conn, err := sql.Open("sqlite", path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open database %s: %w", path, err)
 	}
 	conn.SetMaxOpenConns(1)
 	store := &Store{db: conn}
 	if err := store.migrate(context.Background()); err != nil {
 		_ = conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("open database %s: %w", path, err)
 	}
 	return store, nil
 }
