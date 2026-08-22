@@ -1,3 +1,7 @@
 /.work.sqlite
 /work
+/dist/
 /.private/
+/.ai/
+/.playwright-mcp/
+.DS_Store
