@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Rasalas/work-cli/internal/calendar"
 	"github.com/Rasalas/work-cli/internal/db"
 	"github.com/Rasalas/work-cli/internal/timeparse"
 )
@@ -300,7 +301,7 @@ func targetEndForSession(ctx context.Context, store *db.Store, running db.Sessio
 	if referenceEnd.Before(running.StartedAt) {
 		return targetEndInfo{}, fmt.Errorf("end time cannot be before start time")
 	}
-	if !dayStart(referenceEnd).Equal(dayStart(running.StartedAt)) {
+	if !calendar.DayStart(referenceEnd).Equal(calendar.DayStart(running.StartedAt)) {
 		return targetEndInfo{}, fmt.Errorf("--at-target requires the running session to start and end on the same day")
 	}
 	schedule, err := store.ProjectSchedule(ctx, running.ProjectID.Int64)
@@ -326,7 +327,7 @@ func targetEndForSession(ctx context.Context, store *db.Store, running db.Sessio
 		return targetEndInfo{}, fmt.Errorf("project %q has no target on %s", running.ProjectName.String, workdayLabel(running.StartedAt.Weekday()))
 	}
 
-	start := dayStart(running.StartedAt)
+	start := calendar.DayStart(running.StartedAt)
 	end := start.AddDate(0, 0, 1)
 	sessions, err := store.LogSessions(ctx, &start, &end, running.ProjectName.String)
 	if err != nil {
@@ -390,7 +391,7 @@ func overtimeForEnd(ctx context.Context, store *db.Store, running db.Session, en
 		return 0, 0, 0, fmt.Errorf("project %q has no target on %s", running.ProjectName.String, workdayLabel(endedAt.Weekday()))
 	}
 
-	start := dayStart(endedAt)
+	start := calendar.DayStart(endedAt)
 	end := start.AddDate(0, 0, 1)
 	sessions, err := store.LogSessions(ctx, &start, &end, running.ProjectName.String)
 	if err != nil {
