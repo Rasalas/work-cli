@@ -3,7 +3,9 @@ package db
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -219,4 +221,154 @@ func newStore(t *testing.T) *Store {
 		}
 	})
 	return store
+}
+
+func TestOpenSetsUserVersionToLatestMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "work.sqlite")
+	store, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer store.Close()
+
+	var version int
+	if err := store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatalf("PRAGMA user_version error = %v", err)
+	}
+	if version != len(migrations) {
+		t.Fatalf("user_version = %d, want %d", version, len(migrations))
+	}
+}
+
+func TestOpenIsIdempotentAndDoesNotBackUpMigratedDatabase(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "work.sqlite")
+
+	store, err := Open(path)
+	if err != nil {
+		t.Fatalf("first Open() error = %v", err)
+	}
+	if _, err := store.AddProject(context.Background(), "alpha"); err != nil {
+		t.Fatalf("AddProject() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	store, err = Open(path)
+	if err != nil {
+		t.Fatalf("second Open() error = %v", err)
+	}
+	defer store.Close()
+
+	project, err := store.ProjectByName(context.Background(), "alpha")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+	if project.Name != "alpha" {
+		t.Fatalf("project name = %q, want alpha", project.Name)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir() error = %v", err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), ".pre-migration-") {
+			t.Fatalf("unexpected pre-migration backup %q for already migrated database", entry.Name())
+		}
+	}
+}
+
+func TestOpenBacksUpPreMigrationDatabase(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "work.sqlite")
+
+	// Simulate a legacy database: user_version is 0 (untracked), but the
+	// schema already matches migration 1. Opening must create a backup
+	// snapshot before applying migrations and must not lose data.
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open() error = %v", err)
+	}
+	if _, err := legacy.Exec(migrations[0]); err != nil {
+		t.Fatalf("seed legacy schema: %v", err)
+	}
+	if _, err := legacy.Exec(`
+INSERT INTO projects (name, created_at, updated_at, archived_at)
+VALUES ('legacy', '2026-01-02T08:00:00Z', '2026-01-02T08:00:00Z', NULL);
+`); err != nil {
+		t.Fatalf("seed project row: %v", err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	store, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer store.Close()
+
+	var version int
+	if err := store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatalf("PRAGMA user_version error = %v", err)
+	}
+	if version != len(migrations) {
+		t.Fatalf("user_version = %d, want %d", version, len(migrations))
+	}
+
+	project, err := store.ProjectByName(context.Background(), "legacy")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+	if project.Name != "legacy" {
+		t.Fatalf("project name = %q, want legacy", project.Name)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(dir, "*.pre-migration-*.bak"))
+	if err != nil {
+		t.Fatalf("Glob() error = %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("found %d pre-migration backups, want 1 (%v)", len(matches), matches)
+	}
+}
+
+func TestBackupWritesConsistentSnapshot(t *testing.T) {
+	store := newStore(t)
+	ctx := context.Background()
+	if _, err := store.AddProject(ctx, "backed-up"); err != nil {
+		t.Fatalf("AddProject() error = %v", err)
+	}
+
+	target := filepath.Join(t.TempDir(), "backup.sqlite")
+	if err := store.Backup(ctx, target); err != nil {
+		t.Fatalf("Backup() error = %v", err)
+	}
+
+	restored, err := Open(target)
+	if err != nil {
+		t.Fatalf("Open(backup) error = %v", err)
+	}
+	defer restored.Close()
+
+	project, err := restored.ProjectByName(ctx, "backed-up")
+	if err != nil {
+		t.Fatalf("ProjectByName() on backup error = %v", err)
+	}
+	if project.Name != "backed-up" {
+		t.Fatalf("project name = %q, want backed-up", project.Name)
+	}
+}
+
+func TestBackupRejectsExistingTarget(t *testing.T) {
+	store := newStore(t)
+	target := filepath.Join(t.TempDir(), "backup.sqlite")
+	if err := os.WriteFile(target, []byte(""), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := store.Backup(context.Background(), target); err == nil {
+		t.Fatal("Backup() with existing target should fail")
+	}
 }
