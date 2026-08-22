@@ -97,15 +97,15 @@ func noteCmd(kind string) *cobra.Command {
 			now := time.Now()
 			var note db.Note
 			if opts.sessionID > 0 || opts.last || opts.at != "" {
-				session, err := noteTargetSession(ctx, store, opts.sessionID, opts.last)
-				if errors.Is(err, db.ErrNoRunningSession) {
+				session, sessionErr := noteTargetSession(ctx, store, opts.sessionID, opts.last)
+				if errors.Is(sessionErr, db.ErrNoRunningSession) {
 					return fmt.Errorf("no session is running; use `work start`, `%s --last`, or `%s --session <id>`", kind, kind)
 				}
-				if errors.Is(err, sql.ErrNoRows) {
+				if errors.Is(sessionErr, sql.ErrNoRows) {
 					return fmt.Errorf("session #%d not found", opts.sessionID)
 				}
-				if err != nil {
-					return err
+				if sessionErr != nil {
+					return sessionErr
 				}
 				if session == nil {
 					if opts.last {
@@ -113,9 +113,9 @@ func noteCmd(kind string) *cobra.Command {
 					}
 					return fmt.Errorf("no session is running; use `work start`, `%s --last`, or `%s --session <id>`", kind, kind)
 				}
-				createdAt, err := parseNoteTime(opts.at, *session, now)
-				if err != nil {
-					return err
+				createdAt, createdAtErr := parseNoteTime(opts.at, *session, now)
+				if createdAtErr != nil {
+					return createdAtErr
 				}
 				note, err = store.AddNoteToSession(ctx, session.ID, kind, noteBody, createdAt)
 			} else {
