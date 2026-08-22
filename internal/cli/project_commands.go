@@ -10,6 +10,7 @@ import (
 	"github.com/sahilm/fuzzy"
 	"github.com/spf13/cobra"
 
+	"github.com/Rasalas/work-cli/internal/calendar"
 	"github.com/Rasalas/work-cli/internal/db"
 	"github.com/Rasalas/work-cli/internal/timeparse"
 	"github.com/Rasalas/work-cli/internal/tui"
@@ -217,7 +218,7 @@ func projectBalanceCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				date := dayStart(time.Now())
+				date := calendar.DayStart(time.Now())
 				if opts.date != "" {
 					date, err = parseLogDate(opts.date, time.Local)
 					if err != nil {
