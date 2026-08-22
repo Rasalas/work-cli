@@ -54,13 +54,6 @@ const (
 	noteKindWidth  = 5
 )
 
-func printNotes(notes []db.Note) {
-	for _, note := range notes {
-		printLine(noteLine(note))
-	}
-	fmt.Fprintln(out)
-}
-
 func printBlock(lines ...string) {
 	if len(lines) == 0 {
 		return

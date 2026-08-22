@@ -12,8 +12,6 @@ type options struct {
 	noProject bool
 	at        string
 	target    string
-	today     bool
-	week      bool
 }
 
 func Execute() {

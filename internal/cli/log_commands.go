@@ -178,14 +178,6 @@ func logNoteLine(sessionID int64, note db.Note) string {
 	return fmt.Sprintf("%*s%s", len(fmt.Sprintf("#%d   ", sessionID)), "", noteLine(note))
 }
 
-func todayDuration(ctx context.Context, store *db.Store, now time.Time) (time.Duration, error) {
-	summary, err := todaySummary(ctx, store, now)
-	if err != nil {
-		return 0, err
-	}
-	return summary.Work, nil
-}
-
 type daySummaryInfo struct {
 	Sessions []db.Session
 	Work     time.Duration

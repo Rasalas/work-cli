@@ -28,4 +28,20 @@ jobs:
           cache: false
 
       - name: Test
-        run: go test ./...
+        run: go test -race ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8

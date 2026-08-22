@@ -1,0 +1,27 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - misspell
+    - staticcheck
+    - unconvert
+  settings:
+    errcheck:
+      exclude-functions:
+        # Deferred cleanup helpers where the error carries no actionable
+        # information for a short-lived CLI process.
+        - (*github.com/Rasalas/work-cli/internal/db.Store).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Tx).Rollback
+        - (io.Closer).Close
+        - (*os.File).Close
+        - os.Remove
+        # Best-effort stdout printing.
+        - fmt.Fprintln
+        - fmt.Fprintf
+
+formatters:
+  enable:
+    - gofmt
