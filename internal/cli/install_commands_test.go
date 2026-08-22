@@ -2,6 +2,10 @@ package cli
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -105,5 +109,40 @@ func TestVersionCommandPrintsVersion(t *testing.T) {
 
 	if got, want := buf.String(), "work dev\ncommit unknown\nbuilt unknown\n"; got != want {
 		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
+func TestVerifyChecksumAcceptsMatchingAndRejectsTamperedScript(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "install.sh")
+	content := []byte("#!/usr/bin/env bash\necho hi\n")
+	if err := os.WriteFile(script, content, 0o700); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	sum := sha256.Sum256(content)
+	checksums := fmt.Sprintf("%x  install.sh\n%s  work-cli_v1.0.0_darwin_arm64.tar.gz\n",
+		sum, "0000000000000000000000000000000000000000000000000000000000000000")
+
+	if err := verifyChecksum(script, []byte(checksums), "install.sh"); err != nil {
+		t.Fatalf("verifyChecksum() error = %v", err)
+	}
+
+	if err := os.WriteFile(script, []byte("#!/usr/bin/env bash\nrm -rf /\n"), 0o700); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := verifyChecksum(script, []byte(checksums), "install.sh"); err == nil {
+		t.Fatal("verifyChecksum() should reject a tampered script")
+	}
+}
+
+func TestVerifyChecksumFailsWithoutChecksumEntry(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "install.sh")
+	if err := os.WriteFile(script, []byte("echo hi"), 0o700); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := verifyChecksum(script, []byte("deadbeef  other-file.txt\n"), "install.sh"); err == nil {
+		t.Fatal("verifyChecksum() without matching entry should fail")
 	}
 }
