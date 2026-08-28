@@ -52,8 +52,6 @@ work note edit 3 --at 1330
 work status
 work end 1402
 work end --at-target
-work end --use-overtime
-work end 1402 --use-overtime
 work end 1402 --use-overtime=1h
 work log --today
 work log --since 14d
@@ -129,41 +127,44 @@ The optional `--date YYYY-MM-DD` flag records the balance adjustment date:
 work project balance someproject --set 80h --date 2026-06-03
 ```
 
-End a session now and use enough overtime to reach today's planned target:
-
-```bash
-work end --use-overtime
-```
-
-To use a fixed end time instead:
-
-```bash
-work end 1400 --use-overtime
-```
-
-Use an explicit amount instead with the `=<duration>` form:
-
-```bash
-work end 1400 --use-overtime=1h
-```
-
-The session keeps its actual end time. Overtime use is stored separately,
-reduces the balance immediately, and counts toward the weekly target without
-being deducted a second time when the week completes.
-
-If a forgotten pause leaves a session running beyond today's planned target,
-end it exactly when the target was reached:
+Finish the day at today's planned target:
 
 ```bash
 work end --at-target
 ```
 
-Earlier sessions and overtime already used on the same day are included. The
-command refuses to end the session in the future when the target has not been
-reached yet. Use `--use-overtime` instead to end now and cover the remainder.
-Because that keeps the actual end time while `--at-target` moves it backward,
-the flags cannot be combined. An explicit reference time can be supplied for a
-correction:
+When you stop before the target, the command fills the remaining time from the
+project's overtime balance. Its `ended` line and the stop shown by `work status`
+use the planned target time. The output also shows the earlier, actual time as
+`stopped`. The database keeps that actual time separately so worked time and
+overtime remain distinct.
+
+An explicit actual stop time can be supplied:
+
+```bash
+work end 1400 --at-target
+```
+
+To use a specific amount without filling the whole target, use the
+`=<duration>` form:
+
+```bash
+work end 1400 --use-overtime=1h
+```
+
+Overtime use reduces the balance immediately and counts toward the weekly
+target without being deducted a second time when the week completes.
+
+If a forgotten pause leaves a session running beyond today's planned target,
+the same command moves the end back to when the target was reached:
+
+```bash
+work end --at-target
+```
+
+Earlier sessions and overtime already used on the same day are included.
+`--use-overtime` without a value remains an alias for this automatic behavior.
+An explicit reference time can also correct an older overrun:
 
 ```bash
 work end 1530 --at-target

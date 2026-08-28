@@ -44,6 +44,43 @@ func TestEndAtTargetUsesOnlyRemainingDailyWork(t *testing.T) {
 	}
 }
 
+func TestEndAtTargetUsesOvertimeWhenEndingBeforeTarget(t *testing.T) {
+	dbPath := useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "25h", "--workdays", "mon,tue,wed,thu,fri")
+	runWorkCommand(t, "project", "balance", "someproject", "--set", "80h", "--date", "2026-08-03")
+	runWorkCommand(t, "start", "2026-08-04 08:00")
+
+	output := runWorkCommand(t, "end", "--at", "2026-08-04 12:30", "--at-target")
+
+	assertOutputContains(t, output, []string{
+		"2026-08-04 13:00",
+		"worked",
+		"4h 30m",
+		"overtime",
+		"30m",
+		"accounted",
+		"5h / 5h",
+		"balance",
+		"+79h 30m",
+	})
+
+	store, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	defer store.Close()
+	last, err := store.LastEndedSession(context.Background())
+	if err != nil {
+		t.Fatalf("LastEndedSession() error = %v", err)
+	}
+	wantActualEnd := time.Date(2026, 8, 4, 12, 30, 0, 0, time.Local)
+	if last == nil || !last.EndedAt.Valid || !last.EndedAt.Time.Equal(wantActualEnd) {
+		t.Fatalf("last ended session = %#v, want actual end %s", last, wantActualEnd)
+	}
+}
+
 func TestEndAtTargetIncludesOvertimeAlreadyUsedToday(t *testing.T) {
 	dbPath := useTempWorkDB(t)
 
@@ -82,20 +119,25 @@ func TestEndAtTargetIncludesOvertimeAlreadyUsedToday(t *testing.T) {
 	}
 }
 
-func TestEndAtTargetKeepsSessionRunningUntilTargetIsReached(t *testing.T) {
+func TestEndAtTargetUsesOvertimeForAllRemainingWork(t *testing.T) {
 	dbPath := useTempWorkDB(t)
 
 	runWorkCommand(t, "project", "add", "someproject")
 	runWorkCommand(t, "project", "set", "someproject", "--weekly", "25h", "--workdays", "mon,tue,wed,thu,fri")
 	runWorkCommand(t, "start", "2026-08-04 08:00")
 
-	err := runWorkCommandError("end", "--at", "2026-08-04 11:00", "--at-target")
-	if err == nil {
-		t.Fatal("work end --at-target error = nil, want target-not-reached error")
-	}
-	if got := err.Error(); got != "today's target will be reached at 13:00; use --use-overtime to end at the specified time (or now) and cover the remainder, or try --at-target later" {
-		t.Fatalf("error = %q", got)
-	}
+	output := runWorkCommand(t, "end", "--at", "2026-08-04 11:00", "--at-target")
+	assertOutputContains(t, output, []string{
+		"2026-08-04 13:00",
+		"stopped",
+		"2026-08-04 11:00",
+		"worked",
+		"3h",
+		"overtime",
+		"2h",
+		"accounted",
+		"5h / 5h",
+	})
 
 	store, openErr := db.Open(dbPath)
 	if openErr != nil {
@@ -106,8 +148,8 @@ func TestEndAtTargetKeepsSessionRunningUntilTargetIsReached(t *testing.T) {
 	if queryErr != nil {
 		t.Fatalf("RunningSession() error = %v", queryErr)
 	}
-	if running == nil {
-		t.Fatal("RunningSession() = nil, want session to remain running")
+	if running != nil {
+		t.Fatalf("RunningSession() = %#v, want nil", running)
 	}
 }
 
@@ -117,7 +159,7 @@ func TestEndAtTargetRejectsUseOvertimeCombination(t *testing.T) {
 			useTempWorkDB(t)
 
 			err := runWorkCommandError("end", "--at-target", overtimeFlag)
-			if err == nil || err.Error() != "use --at-target to correct an overrun, or --use-overtime to end at the specified time (or now) and fill today's remaining target" {
+			if err == nil || err.Error() != "use --at-target to finish at today's target, or --use-overtime=<duration> to use a specific amount" {
 				t.Fatalf("error = %v, want mutually exclusive flags error", err)
 			}
 		})

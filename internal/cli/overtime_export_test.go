@@ -25,6 +25,10 @@ func TestEndUseOvertimeFillsPlannedDailyTarget(t *testing.T) {
 	output := runWorkCommand(t, "end", "--at", "2026-08-04 11:30", "--use-overtime")
 
 	assertOutputContains(t, output, []string{
+		"ended",
+		"2026-08-04 13:00",
+		"stopped",
+		"2026-08-04 11:30",
 		"worked",
 		"3h 30m",
 		"overtime",
@@ -70,6 +74,10 @@ func TestEndUseOvertimeAcceptsExplicitDuration(t *testing.T) {
 	output := runWorkCommand(t, "end", "--at", "2026-08-04 11:30", "--use-overtime=1h")
 
 	assertOutputContains(t, output, []string{
+		"ended",
+		"2026-08-04 12:30",
+		"stopped",
+		"2026-08-04 11:30",
 		"worked",
 		"3h 30m",
 		"overtime",
@@ -87,6 +95,40 @@ func TestEndUseOvertimeAcceptsExplicitDuration(t *testing.T) {
 	}, "\n")
 	if exported != want {
 		t.Fatalf("export = %q, want %q", exported, want)
+	}
+}
+
+func TestStatusShowsPlannedStopAfterUsingOvertime(t *testing.T) {
+	useTempWorkDB(t)
+
+	runWorkCommand(t, "project", "add", "someproject")
+	runWorkCommand(t, "project", "set", "someproject", "--weekly", "25h", "--workdays", "mon,tue,wed,thu,fri")
+	runWorkCommand(t, "start", "2026-08-04 08:00")
+	runWorkCommand(t, "end", "--at", "2026-08-04 12:30", "--at-target")
+
+	store, err := openStore()
+	if err != nil {
+		t.Fatalf("openStore() error = %v", err)
+	}
+	defer store.Close()
+	start := time.Date(2026, 8, 4, 0, 0, 0, 0, time.Local)
+	end := start.AddDate(0, 0, 1)
+	sessions, err := store.LogSessions(context.Background(), &start, &end, "someproject")
+	if err != nil {
+		t.Fatalf("LogSessions() error = %v", err)
+	}
+
+	groups, err := todayNotes(context.Background(), store, sessions)
+	if err != nil {
+		t.Fatalf("todayNotes() error = %v", err)
+	}
+	if len(groups) != 1 || len(groups[0].Events) != 2 {
+		t.Fatalf("todayNotes() = %#v, want one start and stop", groups)
+	}
+	stop := groups[0].Events[1]
+	want := time.Date(2026, 8, 4, 13, 0, 0, 0, time.Local)
+	if stop.Kind != "stop" || !stop.At.Equal(want) {
+		t.Fatalf("stop = %#v, want %s", stop, want)
 	}
 }
 

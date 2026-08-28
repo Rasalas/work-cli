@@ -117,10 +117,21 @@ func TestLogSessionHeaderIncludesIDDurationProjectAndTime(t *testing.T) {
 		EndedAt:     sql.NullTime{Time: end, Valid: true},
 	}
 
-	got := logSessionHeader(session, end)
+	got := logSessionHeader(session, end, 0)
 	want := "#2     1h 23m    thk  2026-05-22 12:38 - 2026-05-22 14:01"
 	if got != want {
 		t.Fatalf("logSessionHeader() = %q, want %q", got, want)
+	}
+}
+
+func TestLogSessionHeaderKeepsRunningLabel(t *testing.T) {
+	start := time.Date(2026, 5, 22, 12, 38, 0, 0, time.Local)
+	now := time.Date(2026, 5, 22, 14, 1, 0, 0, time.Local)
+	session := db.Session{ID: 2, StartedAt: start}
+
+	got := logSessionHeader(session, now, 0)
+	if !strings.Contains(got, "2026-05-22 12:38 - running") {
+		t.Fatalf("logSessionHeader() = %q, want running end", got)
 	}
 }
 

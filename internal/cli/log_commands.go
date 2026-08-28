@@ -69,8 +69,12 @@ func logCmd() *cobra.Command {
 			}
 			chronologicalSessions(sessions)
 			for _, session := range sessions {
+				overtime, err := store.SessionOvertimeUsed(ctx, session.ID)
+				if err != nil {
+					return err
+				}
 				lines := []string{
-					logSessionHeader(session, now),
+					logSessionHeader(session, now, overtime),
 				}
 				printBlock(lines...)
 				notes, err := store.NotesForSession(ctx, session.ID)
@@ -155,9 +159,15 @@ func parseLogSince(input string, now time.Time) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("invalid since value %q; use duration like 14d, 2w, 336h, or YYYY-MM-DD", input)
 }
 
-func logSessionHeader(session db.Session, now time.Time) string {
-	timing := metaStyle.Render(formatDateTime(session.StartedAt) + " - " + formatEnd(&session))
-	duration := logDurationStyle.Render(formatSessionDuration(session, now))
+func logSessionHeader(session db.Session, now time.Time, overtime time.Duration) string {
+	end := now
+	formattedEnd := "running"
+	if session.EndedAt.Valid {
+		end = session.EndedAt.Time.Add(overtime)
+		formattedEnd = formatDateTime(end)
+	}
+	timing := metaStyle.Render(formatDateTime(session.StartedAt) + " - " + formattedEnd)
+	duration := logDurationStyle.Render(formatDuration(end.Sub(session.StartedAt)))
 	id := metaStyle.Render(fmt.Sprintf("#%d", session.ID))
 	if session.ProjectName.Valid {
 		return fmt.Sprintf("%s   %s  %s  %s", id, duration, valueStyle.Render(session.ProjectName.String), timing)

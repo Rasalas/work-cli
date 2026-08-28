@@ -88,6 +88,19 @@ func (s *Store) ProjectOvertimeUsed(ctx context.Context, projectID int64, from, 
 	return total, nil
 }
 
+func (s *Store) SessionOvertimeUsed(ctx context.Context, sessionID int64) (time.Duration, error) {
+	var minutes int64
+	err := s.db.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(minutes), 0)
+FROM project_overtime_usages
+WHERE session_id = ?
+`, sessionID).Scan(&minutes)
+	if err != nil {
+		return 0, err
+	}
+	return time.Duration(minutes) * time.Minute, nil
+}
+
 func (s *Store) AddProjectAbsence(ctx context.Context, projectID int64, startsOn, endsOn time.Time, kind string) (ProjectAbsence, error) {
 	startsOn = calendar.DayStart(startsOn)
 	endsOn = calendar.DayStart(endsOn)
